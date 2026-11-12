@@ -2511,6 +2511,11 @@ fn workdesk_builtin_config() {
         b.insert("hide-help-cards".to_owned(), "Y".to_owned());
         b.insert("hide-powered-by-me".to_owned(), "Y".to_owned());
     }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let mut m = config::HARD_SETTINGS.write().unwrap();
+        m.insert("conn-type".to_owned(), "outgoing".to_owned());
+    }
 }
 // <<< WorkDesk
 pub fn load_custom_client() {

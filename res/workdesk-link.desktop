@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=WorkDesk
+NoDisplay=true
+MimeType=x-scheme-handler/workdesk;
+TryExec=workdesk
+Exec=workdesk %u
+Icon=workdesk
+Terminal=false
+Type=Application
+StartupNotify=false
+StartupWMClass=workdesk

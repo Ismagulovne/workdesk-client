@@ -1,0 +1,46 @@
+# Проверка установки Linux-пакета WorkDesk на чистой Ubuntu (запуск вручную, указывается run_id сборки)
+name: WorkDesk — проверка установки Linux
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "ID запуска сборки с артефактом WorkDesk-*-linux-x86_64"
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Скачать пакет
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.run_id }}" -R "${{ github.repository }}" -p 'WorkDesk-*-linux-x86_64' -D pkg && ls -la pkg/*
+      - name: Установить deb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ./pkg/*/workdesk-*-x86_64.deb
+      - name: Проверить установку
+        run: |
+          set -x
+          dpkg -s workdesk | grep -E "Status|Version"
+          ls -la /usr/bin/workdesk /usr/share/workdesk/workdesk
+          test -f /usr/share/applications/workdesk.desktop
+          test -f /usr/share/icons/hicolor/256x256/apps/workdesk.png
+          systemctl is-enabled workdesk
+          sleep 5
+          systemctl status workdesk --no-pager || true
+          systemctl is-active workdesk
+          ps -ef | grep -E "workdesk +--(service|server)" | grep -v grep || true
+          ldd /usr/share/workdesk/workdesk | grep "not found" && exit 1 || echo "все библиотеки найдены"
+          ldd /usr/share/workdesk/lib/librustdesk.so | grep "not found" && exit 1 || echo "все библиотеки найдены"
+      - name: Удалить пакет
+        run: |
+          sudo apt-get remove -y workdesk
+          ! systemctl is-active workdesk
+          test ! -e /usr/bin/workdesk

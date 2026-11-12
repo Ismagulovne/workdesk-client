@@ -12,7 +12,7 @@ Provides:   libdesktop_drop_plugin.so()(64bit), libdesktop_multi_window_plugin.s
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/Scriptlets/
 
 %description
-WorkDesk: remote desktop based on WorkDesk (AGPL-3.0).
+WorkDesk: remote desktop based on RustDesk (AGPL-3.0).
 
 %prep
 # we have no source, so nothing here

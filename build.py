@@ -366,7 +366,7 @@ Maintainer: WorkDesk <info@worktime.kz>
 Homepage: https://github.com/Ismagulovne/workdesk-client
 Depends: libgtk-3-0t64 | libgtk-3-0, libxcb-randr0, libxdo3 | libxdo4, libxfixes3, libxcb-shape0, libxcb-xfixes0, libasound2t64 | libasound2, libsystemd0, curl, libva2, libva-drm2, libva-x11-2, libgstreamer-plugins-base1.0-0, gstreamer1.0-pipewire%s
 Recommends: libayatana-appindicator3-1
-Description: WorkDesk remote desktop (based on WorkDesk)
+Description: WorkDesk remote desktop (based on RustDesk, AGPL-3.0)
 
 """ % (version, get_deb_arch(), get_deb_extra_depends())
     file = open(control_file_path, "w")

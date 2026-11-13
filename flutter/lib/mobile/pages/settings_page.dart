@@ -734,6 +734,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
     final hideSecuritySettings =
         bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) == 'Y';
     final settings = SettingsList(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 48), // WorkDesk: последний пункт не уходит под панель навигации
       sections: [
         customClientSection,
         if (!bind.isDisableAccount())
@@ -1275,7 +1276,8 @@ class __DisplayPageState extends State<_DisplayPage> {
         title: Text(translate('Display Settings')),
         centerTitle: true,
       ),
-      body: SettingsList(sections: [
+      body: SettingsList(contentPadding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 48), // WorkDesk: последний пункт не уходит под панель навигации
+          sections: [
         SettingsSection(
           tiles: [
             _getPopupDialogRadioEntry(

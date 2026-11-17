@@ -29,25 +29,35 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - run: brew install create-dmg pkg-config opus opusfile libvpx
+      - run: brew install create-dmg pkg-config opus opusfile libvpx libaom
 
       - name: Setup build environment for x86_64
         run: |
-          # Setup paths for opus
-          echo "OPUS_DIR=$(brew --prefix opus)" >> $GITHUB_ENV
-          echo "LIBVPX_DIR=$(brew --prefix libvpx)" >> $GITHUB_ENV
-
           # Create VCPKG_ROOT structure pointing to homebrew packages
           VCPKG_ROOT="/tmp/vcpkg-setup"
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/lib"
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/include"
 
-          # Symlink libvpx (for video encoding)
-          ln -sf $(brew --prefix libvpx)/lib/* "$VCPKG_ROOT/installed/x64-osx/lib/" 2>/dev/null || true
-          ln -sf $(brew --prefix libvpx)/include/* "$VCPKG_ROOT/installed/x64-osx/include/" 2>/dev/null || true
+          # Symlink all required libraries
+          for lib in opus opusfile libvpx libaom; do
+            lib_path=$(brew --prefix "$lib")
+            ln -sf "$lib_path/lib"/* "$VCPKG_ROOT/installed/x64-osx/lib/" 2>/dev/null || true
+            ln -sf "$lib_path/include"/* "$VCPKG_ROOT/installed/x64-osx/include/" 2>/dev/null || true
+          done
 
+          echo "OPUS_DIR=$(brew --prefix opus)" >> $GITHUB_ENV
+          echo "LIBVPX_DIR=$(brew --prefix libvpx)" >> $GITHUB_ENV
           echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$(brew --prefix libvpx)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+          # Setup PKG_CONFIG_PATH
+          PKG_CONFIG_PATH=""
+          for lib in opus opusfile libvpx libaom; do
+            lib_path=$(brew --prefix "$lib")
+            if [ -d "$lib_path/lib/pkgconfig" ]; then
+              PKG_CONFIG_PATH="$lib_path/lib/pkgconfig:$PKG_CONFIG_PATH"
+            fi
+          done
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - working-directory: flutter
         run: flutter pub get

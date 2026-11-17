@@ -37,6 +37,10 @@ jobs:
             os: macos-14
             target: aarch64-apple-darwin
             flutter-target: macos
+    if: |
+      github.event.inputs.architecture == 'both' ||
+      (github.event.inputs.architecture == 'x86_64' && matrix.arch == 'x86_64') ||
+      (github.event.inputs.architecture == 'arm64' && matrix.arch == 'arm64')
 
     steps:
       - name: Checkout repository

@@ -27,7 +27,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - run: brew install create-dmg pkg-config libopus
+      - run: brew install create-dmg pkg-config opus
 
       - working-directory: flutter
         run: flutter pub get

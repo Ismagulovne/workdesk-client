@@ -1,0 +1,50 @@
+name: Build macOS x86_64
+
+on:
+  workflow_dispatch:
+
+env:
+  RUST_VERSION: '1.81'
+  FLUTTER_VERSION: '3.44.9'
+  VERSION: 1.5.3
+
+jobs:
+  build:
+    name: Build macOS x86_64
+    runs-on: macos-13
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-apple-darwin
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - run: brew install create-dmg pkg-config libopus
+
+      - working-directory: flutter
+        run: flutter pub get
+
+      - run: cargo build --release --target=x86_64-apple-darwin
+
+      - working-directory: flutter
+        run: flutter build macos --release --build-name=${{ env.VERSION }}
+
+      - run: |
+          mkdir -p dist
+          cp -r flutter/build/macos/Build/Products/Release/RustDesk.app dist/
+          cd dist
+          mkdir -p Payload
+          cp -r RustDesk.app Payload/
+          tar -czf WorkDesk-${{ env.VERSION }}-x86_64.app.tar.gz RustDesk.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-macos-x86_64
+          path: dist/*.tar.gz

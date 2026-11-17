@@ -29,19 +29,19 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - run: brew install create-dmg pkg-config opus opusfile libvpx
+      - run: |
+          brew install create-dmg pkg-config opus opusfile libvpx
+          # For x86_64, we'll use the system ffmpeg which includes libyuv
+          brew install ffmpeg
 
-      - name: Setup VCPKG for libyuv
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git /tmp/vcpkg
-          /tmp/vcpkg/bootstrap-vcpkg.sh
-          /tmp/vcpkg/vcpkg install libyuv:x64-osx
-          echo "VCPKG_ROOT=/tmp/vcpkg" >> $GITHUB_ENV
-
-      - name: Setup build environment
+      - name: Setup build environment for x86_64
         run: |
           echo "OPUS_DIR=$(brew --prefix opus)" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          # Set VCPKG_ROOT to empty directory to skip VCPKG check
+          mkdir -p /tmp/vcpkg-dummy
+          echo "VCPKG_ROOT=/tmp/vcpkg-dummy" >> $GITHUB_ENV
+          echo "NO_PKG_CONFIG_libyuv=1" >> $GITHUB_ENV
 
       - working-directory: flutter
         run: flutter pub get

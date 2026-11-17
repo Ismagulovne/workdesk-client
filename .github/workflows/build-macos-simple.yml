@@ -29,7 +29,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - run: brew install create-dmg pkg-config opus opusfile libvpx libaom
+      - run: brew install create-dmg pkg-config opus opusfile libvpx
 
       - name: Setup build environment for x86_64
         run: |
@@ -38,8 +38,8 @@ jobs:
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/lib"
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/include"
 
-          # Symlink all required libraries
-          for lib in opus opusfile libvpx libaom; do
+          # Symlink all required libraries (use VP9, skip optional AV1)
+          for lib in opus opusfile libvpx; do
             lib_path=$(brew --prefix "$lib")
             ln -sf "$lib_path/lib"/* "$VCPKG_ROOT/installed/x64-osx/lib/" 2>/dev/null || true
             ln -sf "$lib_path/include"/* "$VCPKG_ROOT/installed/x64-osx/include/" 2>/dev/null || true
@@ -51,13 +51,15 @@ jobs:
 
           # Setup PKG_CONFIG_PATH
           PKG_CONFIG_PATH=""
-          for lib in opus opusfile libvpx libaom; do
+          for lib in opus opusfile libvpx; do
             lib_path=$(brew --prefix "$lib")
             if [ -d "$lib_path/lib/pkgconfig" ]; then
               PKG_CONFIG_PATH="$lib_path/lib/pkgconfig:$PKG_CONFIG_PATH"
             fi
           done
           echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          # Skip AOM (AV1) which is not available in Homebrew on macOS
+          echo "NO_PKG_CONFIG_aom=1" >> $GITHUB_ENV
 
       - working-directory: flutter
         run: flutter pub get

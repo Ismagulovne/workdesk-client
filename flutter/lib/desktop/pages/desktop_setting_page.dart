@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common/workdesk_update.dart';
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/consts.dart';
@@ -2616,6 +2617,9 @@ class _AboutState extends State<_About> {
                   child: Text('${translate('ID')}: $myId')
                       .marginSymmetric(vertical: 4.0)),
               InkWell(
+                  onTap: () => workdeskCheckUpdate(context),
+                  child: Text('Проверить обновления', style: linkStyle).marginSymmetric(vertical: 4.0)),
+              InkWell(
                   onTap: () {
                     launchUrlString('https://rustdesk.com/privacy.html');
                   },
@@ -2625,7 +2629,7 @@ class _AboutState extends State<_About> {
                   ).marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://rustdesk.com');
+                    launchUrlString('https://workdesk.itgov.kz');
                   },
                   child: Text(
                     translate('Website'),

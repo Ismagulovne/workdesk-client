@@ -1308,7 +1308,7 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "https://admin.rustdesk.com".to_owned()
+    "https://workdesk.itgov.kz".to_owned()
 }
 
 #[inline]
@@ -2506,7 +2506,34 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
+// >>> WorkDesk: встроенные настройки и имя программы (сгенерировано prepare_fork.py)
+fn workdesk_builtin_config() {
+    *config::APP_NAME.write().unwrap() = "WorkDesk".to_owned();
+    {
+        let mut o = config::OVERWRITE_SETTINGS.write().unwrap();
+        o.insert("custom-rendezvous-server".to_owned(), "workdesk.itgov.kz".to_owned());
+        o.insert("relay-server".to_owned(), "workdesk.itgov.kz".to_owned());
+        o.insert("api-server".to_owned(), "https://workdesk.itgov.kz".to_owned());
+        o.insert("key".to_owned(), "l1vPDdfAzChJ1DI2bPuJjIaiIHJ68LuAFspjSXwzyAg=".to_owned());
+        o.insert("allow-auto-update".to_owned(), "N".to_owned());
+        o.insert("allow-remote-config-modification".to_owned(), "N".to_owned());
+    }
+    {
+        let mut b = config::BUILTIN_SETTINGS.write().unwrap();
+        b.insert("hide-server-settings".to_owned(), "Y".to_owned());
+        b.insert("hide-network-settings".to_owned(), "Y".to_owned());
+        b.insert("hide-help-cards".to_owned(), "Y".to_owned());
+        b.insert("hide-powered-by-me".to_owned(), "Y".to_owned());
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let mut m = config::HARD_SETTINGS.write().unwrap();
+        m.insert("conn-type".to_owned(), "outgoing".to_owned());
+    }
+}
+// <<< WorkDesk
 pub fn load_custom_client() {
+    workdesk_builtin_config();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());

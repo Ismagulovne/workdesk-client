@@ -29,12 +29,13 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - run: brew install create-dmg pkg-config opus opusfile libvpx
+      - run: brew install create-dmg pkg-config opus opusfile libvpx libyuv
 
-      - name: Setup Opus environment
+      - name: Setup build environment
         run: |
           echo "OPUS_DIR=$(brew --prefix opus)" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "LIBYUV_DIR=$(brew --prefix libyuv)" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$(brew --prefix libyuv)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - working-directory: flutter
         run: flutter pub get

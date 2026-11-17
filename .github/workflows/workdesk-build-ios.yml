@@ -1,0 +1,227 @@
+name: WorkDesk — сборка iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: Архитектура
+        type: choice
+        options:
+          - arm64
+          - x86_64
+          - universal
+        default: arm64
+
+env:
+  RUST_VERSION: '1.75'
+  FLUTTER_VERSION: '3.44.9'
+  VERSION: 1.5.3
+  APP_NAME: WorkDesk
+
+jobs:
+  build-ios:
+    name: Build iOS ${{ matrix.arch }}
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ARM64 для реальных устройств (iPhone)
+          - arch: arm64
+            sdk: iphoneos
+            flutter-target: ios
+          # x86_64 для симулятора
+          - arch: x86_64
+            sdk: iphonesimulator
+            flutter-target: ios
+
+    if: |
+      github.event.inputs.architecture == 'universal' ||
+      (github.event.inputs.architecture == 'arm64' && matrix.arch == 'arm64') ||
+      (github.event.inputs.architecture == 'x86_64' && matrix.arch == 'x86_64')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-ios, x86_64-apple-ios
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install iOS deployment target
+        run: |
+          flutter pub global activate pod-install
+
+      - name: Get dependencies
+        run: |
+          cd flutter
+          flutter pub get
+
+      - name: Build Rust for iOS (${{ matrix.arch }})
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            cargo build --release --target=aarch64-apple-ios
+          else
+            cargo build --release --target=x86_64-apple-ios
+          fi
+
+      - name: Build iOS app (${{ matrix.arch }})
+        run: |
+          cd flutter
+          flutter build ios --release --no-codesign --build-name=${{ env.VERSION }}
+
+      - name: Create IPA (unsigned)
+        run: |
+          cd flutter
+
+          # Создаем папку для output
+          mkdir -p dist
+
+          # Копируем build
+          cp -r build/ios/Release-iphoneos dist/
+
+          # Создаем IPA без подписи (для тестирования)
+          mkdir -p dist/Payload
+          cp -r build/ios/Release-iphoneos/Runner.app dist/Payload/
+
+          # Создаем zip архив
+          cd dist
+          zip -r WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.ipa Payload/
+          rm -rf Payload/
+
+          # Переименовываем если нужна .app архив
+          tar -czf WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.app.tar.gz Release-iphoneos/Runner.app
+
+      - name: Verify built artifacts
+        run: |
+          cd flutter/dist
+          ls -lh
+          file *.ipa || echo "No IPA files"
+          file *.tar.gz || echo "No tar.gz files"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-ios-${{ matrix.arch }}-ipa
+          path: flutter/dist/*.ipa
+          retention-days: 30
+
+      - name: Upload app tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-ios-${{ matrix.arch }}-app
+          path: flutter/dist/*.tar.gz
+          retention-days: 30
+
+  build-universal:
+    name: Build universal iOS binary
+    needs: build-ios
+    runs-on: macos-14
+    if: ${{ github.event.inputs.architecture == 'universal' }}
+
+    steps:
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: workdesk-ios-arm64-app
+          path: dist-arm64
+
+      - name: Download x86_64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: workdesk-ios-x86_64-app
+          path: dist-x86_64
+
+      - name: Create universal binary
+        run: |
+          # Распаковываем оба архива
+          cd dist-arm64 && tar -xzf *.tar.gz && cd ..
+          cd dist-x86_64 && tar -xzf *.tar.gz && cd ..
+
+          # Создаем universal binary
+          mkdir -p dist-universal
+          cp -r dist-arm64/Runner.app dist-universal/
+
+          # Используем lipo для создания universal binary
+          lipo -create \
+            dist-arm64/Runner.app/Runner \
+            dist-x86_64/Runner.app/Runner \
+            -output dist-universal/Runner.app/Runner-universal
+
+          mv dist-universal/Runner.app/Runner-universal \
+             dist-universal/Runner.app/Runner
+
+          # Создаем universal IPA
+          mkdir -p dist-universal/Payload
+          cp -r dist-universal/Runner.app dist-universal/Payload/
+
+          cd dist-universal
+          zip -r WorkDesk-universal.ipa Payload/
+          tar -czf WorkDesk-universal.app.tar.gz Runner.app
+          cd ..
+
+      - name: Upload universal IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-ios-universal-ipa
+          path: dist-universal/*.ipa
+          retention-days: 30
+
+      - name: Upload universal app tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-ios-universal-app
+          path: dist-universal/*.tar.gz
+          retention-days: 30
+
+  code-sign-and-release:
+    name: Code sign and create Release
+    needs: build-ios
+    runs-on: macos-14
+    if: ${{ secrets.IOS_CERTIFICATE_P12 != '' && secrets.IOS_PROVISIONING_PROFILE != '' }}
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Import code signing certificate
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        run: |
+          # Создаем keychain
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          # Импортируем сертификат
+          echo "$CERTIFICATE_P12_BASE64" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool,apple:,codesign,/usr/bin/codesign -s -k "" build.keychain
+
+      - name: Code sign IPA
+        env:
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          # Это требует более сложной настройки
+          echo "Code signing requires additional setup"
+
+      - name: Create Release
+        if: github.event.inputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.ipa
+          tag_name: ios-${{ env.VERSION }}
+          draft: true
+          prerelease: true

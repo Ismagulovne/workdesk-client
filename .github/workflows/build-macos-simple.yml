@@ -29,13 +29,19 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - run: brew install create-dmg pkg-config opus opusfile libvpx libyuv
+      - run: brew install create-dmg pkg-config opus opusfile libvpx
+
+      - name: Setup VCPKG for libyuv
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git /tmp/vcpkg
+          /tmp/vcpkg/bootstrap-vcpkg.sh
+          /tmp/vcpkg/vcpkg install libyuv:x64-osx
+          echo "VCPKG_ROOT=/tmp/vcpkg" >> $GITHUB_ENV
 
       - name: Setup build environment
         run: |
           echo "OPUS_DIR=$(brew --prefix opus)" >> $GITHUB_ENV
-          echo "LIBYUV_DIR=$(brew --prefix libyuv)" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$(brew --prefix libyuv)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - working-directory: flutter
         run: flutter pub get

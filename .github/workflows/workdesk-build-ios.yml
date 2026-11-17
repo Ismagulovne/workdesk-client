@@ -187,7 +187,7 @@ jobs:
     name: Code sign and create Release
     needs: build-ios
     runs-on: macos-14
-    if: ${{ secrets.IOS_CERTIFICATE_P12 != '' && secrets.IOS_PROVISIONING_PROFILE != '' }}
+    if: false # Disabled - requires manual code signing setup
 
     steps:
       - name: Download artifacts

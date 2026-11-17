@@ -29,19 +29,25 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      - run: |
-          brew install create-dmg pkg-config opus opusfile libvpx
-          # For x86_64, we'll use the system ffmpeg which includes libyuv
-          brew install ffmpeg
+      - run: brew install create-dmg pkg-config opus opusfile libvpx
 
       - name: Setup build environment for x86_64
         run: |
+          # Setup paths for opus
           echo "OPUS_DIR=$(brew --prefix opus)" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$(brew --prefix ffmpeg)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-          # Set VCPKG_ROOT to empty directory to skip VCPKG check
-          mkdir -p /tmp/vcpkg-dummy
-          echo "VCPKG_ROOT=/tmp/vcpkg-dummy" >> $GITHUB_ENV
-          echo "NO_PKG_CONFIG_libyuv=1" >> $GITHUB_ENV
+          echo "LIBVPX_DIR=$(brew --prefix libvpx)" >> $GITHUB_ENV
+
+          # Create VCPKG_ROOT structure pointing to homebrew packages
+          VCPKG_ROOT="/tmp/vcpkg-setup"
+          mkdir -p "$VCPKG_ROOT/installed/x64-osx/lib"
+          mkdir -p "$VCPKG_ROOT/installed/x64-osx/include"
+
+          # Symlink libvpx (for video encoding)
+          ln -sf $(brew --prefix libvpx)/lib/* "$VCPKG_ROOT/installed/x64-osx/lib/" 2>/dev/null || true
+          ln -sf $(brew --prefix libvpx)/include/* "$VCPKG_ROOT/installed/x64-osx/include/" 2>/dev/null || true
+
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix opus)/lib/pkgconfig:$(brew --prefix libvpx)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - working-directory: flutter
         run: flutter pub get

@@ -1308,7 +1308,7 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "https://workdesk.itgov.kz".to_owned()
+    "https://worktime.kz/console".to_owned()
 }
 
 #[inline]
@@ -2511,9 +2511,9 @@ fn workdesk_builtin_config() {
     *config::APP_NAME.write().unwrap() = "WorkDesk".to_owned();
     {
         let mut o = config::OVERWRITE_SETTINGS.write().unwrap();
-        o.insert("custom-rendezvous-server".to_owned(), "workdesk.itgov.kz".to_owned());
-        o.insert("relay-server".to_owned(), "workdesk.itgov.kz".to_owned());
-        o.insert("api-server".to_owned(), "https://workdesk.itgov.kz".to_owned());
+        o.insert("custom-rendezvous-server".to_owned(), "server.hrgov.kz".to_owned());
+        o.insert("relay-server".to_owned(), "server.hrgov.kz".to_owned());
+        o.insert("api-server".to_owned(), "https://worktime.kz/console".to_owned());
         o.insert("key".to_owned(), "l1vPDdfAzChJ1DI2bPuJjIaiIHJ68LuAFspjSXwzyAg=".to_owned());
         o.insert("allow-auto-update".to_owned(), "N".to_owned());
         o.insert("allow-remote-config-modification".to_owned(), "N".to_owned());

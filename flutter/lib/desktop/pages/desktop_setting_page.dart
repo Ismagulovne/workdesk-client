@@ -2629,7 +2629,7 @@ class _AboutState extends State<_About> {
                   ).marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://workdesk.itgov.kz');
+                    launchUrlString('https://workdesk.kz');
                   },
                   child: Text(
                     translate('Website'),

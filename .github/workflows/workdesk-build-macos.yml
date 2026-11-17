@@ -61,21 +61,26 @@ jobs:
 
       - name: Get dependencies
         run: |
+          cd flutter
           flutter pub get
-
-      - name: Build macOS app (Flutter)
-        run: |
-          flutter build macos --release --build-name=${{ env.VERSION }}
 
       - name: Build RustDesk desktop (Rust)
         run: |
-          cd flutter
           cargo build --release --target=${{ matrix.target }}
+
+      - name: Build macOS app (Flutter)
+        run: |
+          cd flutter
+          flutter build macos --release --build-name=${{ env.VERSION }}
+
+      - name: Create dist directory
+        run: |
+          mkdir -p dist
 
       - name: Create DMG package
         run: |
           # Копируем скомпилированное приложение
-          cp -r build/macos/Build/Products/Release/RustDesk.app dist/
+          cp -r flutter/build/macos/Build/Products/Release/RustDesk.app dist/
 
           # Создаем DMG
           create-dmg \

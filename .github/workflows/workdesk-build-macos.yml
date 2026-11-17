@@ -34,7 +34,7 @@ jobs:
             flutter-target: macos
           # Apple Silicon arm64
           - arch: arm64
-            os: macos-14
+            os: macos-latest
             target: aarch64-apple-darwin
             flutter-target: macos
     if: |

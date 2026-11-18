@@ -52,9 +52,19 @@ jobs:
           cp -r "$LIBVPX_PATH/include/vpx"/* "$VCPKG_ROOT/installed/x64-osx/include/vpx/" 2>/dev/null || true
           cp -r "$LIBVPX_PATH/lib"/* "$VCPKG_ROOT/installed/x64-osx/lib/" 2>/dev/null || true
 
-          # Create dummy aom.h to satisfy build script
+          # Create dummy aom library to satisfy build script
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/include/aom"
-          touch "$VCPKG_ROOT/installed/x64-osx/include/aom/aom.h"
+
+          # Create minimal aom.h header
+          cat > "$VCPKG_ROOT/installed/x64-osx/include/aom/aom.h" << 'EOF'
+          /* Dummy AOM header for linking purposes */
+          #define AOM_VERSION 1
+          EOF
+
+          # Create minimal libaom.a using ranlib
+          mkdir -p "$VCPKG_ROOT/installed/x64-osx/lib"
+          echo "" | ar r "$VCPKG_ROOT/installed/x64-osx/lib/libaom.a" 2>/dev/null || \
+          ranlib "$VCPKG_ROOT/installed/x64-osx/lib/libaom.a" 2>/dev/null || \
           touch "$VCPKG_ROOT/installed/x64-osx/lib/libaom.a"
 
           # Set environment variables

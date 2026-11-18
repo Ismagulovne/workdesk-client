@@ -75,8 +75,10 @@ jobs:
           # Setup PKG_CONFIG_PATH
           echo "PKG_CONFIG_PATH=$OPUS_PATH/lib/pkgconfig:$LIBVPX_PATH/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
-          # Skip optional codecs
+          # Skip optional codecs and compression libraries not available on macOS x86_64
           echo "NO_PKG_CONFIG_aom=1" >> $GITHUB_ENV
+          echo "NO_PKG_CONFIG_libvpx=1" >> $GITHUB_ENV
+          echo "NO_PKG_CONFIG_libyuv=1" >> $GITHUB_ENV
 
       - working-directory: flutter
         run: flutter pub get

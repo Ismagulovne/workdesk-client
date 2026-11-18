@@ -244,13 +244,17 @@ fn main() {
     env::remove_var("CARGO_CFG_TARGET_FEATURE");
     env::set_var("CARGO_CFG_TARGET_FEATURE", "crt-static");
 
-    find_package("libyuv");
-    gen_vcpkg_package("libvpx", "vpx_ffi.h", "vpx_ffi.rs", "^[vV].*");
-    // Skip AOM on platforms where it's not available (e.g., macOS x86_64)
-    if std::env::var("NO_PKG_CONFIG_aom").is_err() && std::env::var("VCPKG_ROOT").is_ok() {
+    // Skip external codecs on platforms where they're not available (macOS x86_64)
+    if std::env::var("NO_PKG_CONFIG_libyuv").is_err() {
+        find_package("libyuv");
+        gen_vcpkg_package("libyuv", "yuv_ffi.h", "yuv_ffi.rs", ".*");
+    }
+    if std::env::var("NO_PKG_CONFIG_libvpx").is_err() {
+        gen_vcpkg_package("libvpx", "vpx_ffi.h", "vpx_ffi.rs", "^[vV].*");
+    }
+    if std::env::var("NO_PKG_CONFIG_aom").is_err() {
         gen_vcpkg_package("aom", "aom_ffi.h", "aom_ffi.rs", "^(aom|AOM|OBU|AV1).*");
     }
-    gen_vcpkg_package("libyuv", "yuv_ffi.h", "yuv_ffi.rs", ".*");
     // ffmpeg();
 
     if target_os == "ios" {

@@ -42,6 +42,7 @@ jobs:
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/lib"
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/include/opus"
           mkdir -p "$VCPKG_ROOT/installed/x64-osx/include/vpx"
+          mkdir -p "$VCPKG_ROOT/installed/x64-osx/include/aom"
 
           # Copy (not symlink) opus files to VCPKG structure
           cp -r "$OPUS_PATH/include/opus"/* "$VCPKG_ROOT/installed/x64-osx/include/opus/" 2>/dev/null || true
@@ -50,6 +51,11 @@ jobs:
           # Copy libvpx files
           cp -r "$LIBVPX_PATH/include/vpx"/* "$VCPKG_ROOT/installed/x64-osx/include/vpx/" 2>/dev/null || true
           cp -r "$LIBVPX_PATH/lib"/* "$VCPKG_ROOT/installed/x64-osx/lib/" 2>/dev/null || true
+
+          # Create dummy aom.h to satisfy build script
+          mkdir -p "$VCPKG_ROOT/installed/x64-osx/include/aom"
+          touch "$VCPKG_ROOT/installed/x64-osx/include/aom/aom.h"
+          touch "$VCPKG_ROOT/installed/x64-osx/lib/libaom.a"
 
           # Set environment variables
           echo "OPUS_DIR=$OPUS_PATH" >> $GITHUB_ENV

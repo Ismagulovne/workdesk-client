@@ -20,6 +20,9 @@ jobs:
     runs-on: macos-latest
     needs: [generate-bridge]
     timeout-minutes: 150
+    env:
+      HAS_SIGNING: ${{ secrets.ASC_KEY_P8_BASE64 != '' && secrets.APPLE_TEAM_ID != '' }}
+      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID || 'kz.workdesk.client' }}
     steps:
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
@@ -88,20 +91,78 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleName ${APP_NAME}" flutter/ios/Runner/Info.plist
 
       - name: Build IPA archive (no codesign)
+        if: env.HAS_SIGNING != 'true'
         run: |
           cd flutter
           flutter build ipa --release --no-codesign --build-name=${VERSION} --build-number=${{ github.run_number }}
 
       - name: Package unsigned IPA
+        if: env.HAS_SIGNING != 'true'
         run: |
           cd flutter/build/ios/archive/Runner.xcarchive/Products/Applications
           mkdir -p Payload && cp -R Runner.app Payload/
           zip -qry "${GITHUB_WORKSPACE}/${APP_NAME}-${VERSION}-ios-unsigned.ipa" Payload
           ls -lh "${GITHUB_WORKSPACE}"/*.ipa
 
+      - name: Prepare signing
+        if: env.HAS_SIGNING == 'true'
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey.p8"
+          sed -i '' -e "s/com\.carriez\.flutterHbb/${IOS_BUNDLE_ID}/g" -e "s/HZF9JMC8YN/${APPLE_TEAM_ID}/g"             flutter/ios/Runner.xcodeproj/project.pbxproj
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          sed 's#<key>method</key>#<key>destination</key><string>upload</string><key>method</key>#'             "$RUNNER_TEMP/ExportOptions.plist" > "$RUNNER_TEMP/ExportOptionsUpload.plist"
+
+      - name: Build signed archive
+        if: env.HAS_SIGNING == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd flutter
+          flutter build ios --release --config-only --build-name=${VERSION} --build-number=${{ github.run_number }}
+          (cd ios && pod install)
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release             -sdk iphoneos -destination 'generic/platform=iOS'             -archivePath build/ios/archive/Runner.xcarchive archive             -allowProvisioningUpdates             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8"             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"             DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+
+      - name: Export signed IPA
+        if: env.HAS_SIGNING == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive -archivePath flutter/build/ios/archive/Runner.xcarchive             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/ipa"             -allowProvisioningUpdates             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8"             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          cp "$RUNNER_TEMP"/ipa/*.ipa "${GITHUB_WORKSPACE}/${APP_NAME}-${VERSION}-${{ github.run_number }}-ios.ipa"
+          ls -lh "${GITHUB_WORKSPACE}"/*.ipa
+
+      - name: Upload to TestFlight
+        if: env.HAS_SIGNING == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive -archivePath flutter/build/ios/archive/Runner.xcarchive             -exportOptionsPlist "$RUNNER_TEMP/ExportOptionsUpload.plist" -exportPath "$RUNNER_TEMP/upload"             -allowProvisioningUpdates             -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8"             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Remove signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"
+
       - name: Upload IPA
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: workdesk-ios-unsigned-ipa
+          name: workdesk-ios-ipa
           path: ${{ github.workspace }}/*.ipa
           retention-days: 30

@@ -898,7 +898,7 @@ jobs:
       run: |
         Xvfb :99 -screen 0 1280x800x24 -ac &
         sleep 2
-        DISPLAY=:99 xterm -geometry 100x30+10+10 -e bash -c 'echo WorkDesk e2e host; sleep 3600' &
+        DISPLAY=:99 xterm -geometry 100x30+10+10 -e bash -c 'echo WorkDesk e2e host; cat > /tmp/typed.txt' &
         sudo -b env DISPLAY=:99 HOME=/root workdesk --server > host.log 2>&1
         PASS="E2e-$(openssl rand -hex 6)"
         echo "::add-mask::$PASS"

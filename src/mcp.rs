@@ -268,20 +268,19 @@ fn png_size(data: &[u8]) -> Option<(u32, u32)> {
     Some((w, h))
 }
 
-fn shrink_png(data: Vec<u8>) -> (Vec<u8>, u32, u32) {
-    let Some((w, h)) = png_size(&data) else {
-        return (data, 0, 0);
-    };
-    if w.max(h) <= MAX_IMAGE_SIDE {
-        return (data, w, h);
-    }
+// Снимки X11 приходят с нулевым альфа-каналом (BGRX) — без перекодирования картинка прозрачная
+fn normalize_png(data: Vec<u8>) -> (Vec<u8>, u32, u32) {
+    let size = png_size(&data).unwrap_or((0, 0));
     let Ok(img) = image::load_from_memory(&data) else {
-        return (data, w, h);
+        return (data, size.0, size.1);
     };
-    let img = img.resize(MAX_IMAGE_SIDE, MAX_IMAGE_SIDE, image::imageops::FilterType::Triangle);
+    let mut img = image::DynamicImage::ImageRgb8(img.to_rgb8());
+    if img.width().max(img.height()) > MAX_IMAGE_SIDE {
+        img = img.resize(MAX_IMAGE_SIDE, MAX_IMAGE_SIDE, image::imageops::FilterType::Triangle);
+    }
     let mut out = std::io::Cursor::new(Vec::new());
     if img.write_to(&mut out, image::ImageOutputFormat::Png).is_err() {
-        return (data, w, h);
+        return (data, size.0, size.1);
     }
     (out.into_inner(), img.width(), img.height())
 }
@@ -512,7 +511,7 @@ impl Server {
         }
         let data = std::fs::read(&path).map_err(|e| e.to_string())?;
         std::fs::remove_file(&path).ok();
-        let (png, w, h) = shrink_png(data);
+        let (png, w, h) = normalize_png(data);
         c.shot_size.insert(display, (w, h));
         Ok(json!({ "content": [
             { "type": "image", "data": crate::encode64(&png), "mimeType": "image/png" },
@@ -714,7 +713,7 @@ fn trim_echo(body: &str, command: &str) -> String {
             !(t.contains("_END_") && (t.contains("'__WD'") || t.contains("__WD' +")))
         })
         .collect();
-    let skip = lines.iter().position(|l| !first.is_empty() && l.contains(first)).map_or(0, |i| i + 1);
+    let skip = lines.iter().rposition(|l| !first.is_empty() && l.contains(first)).map_or(0, |i| i + 1);
     let out: Vec<&str> = lines.into_iter().skip(skip).collect();
     tail(out.join("\n").trim_matches('\n'), 50000)
 }

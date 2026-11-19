@@ -78,11 +78,14 @@ img = [c for c in res["content"] if c.get("type") == "image"][0]
 png = base64.b64decode(img["data"])
 assert png[:8] == b"\x89PNG\r\n\x1a\n", "снимок не PNG"
 open(os.path.join(out_dir, "screenshot.png"), "wb").write(png)
+assert int.from_bytes(png[16:20], "big") > 100, "снимок слишком маленький"
+assert png[25] == 2, "снимок должен быть RGB без прозрачности"
 
 _, t = tool("workdesk_run", {"command": "echo hello-$((40+2)); uname -s; exit_test() { return 3; }; exit_test", "timeout_sec": 60})
 assert "hello-42" in t, "в выводе нет результата команды"
 assert "Linux" in t
 assert "Код выхода: 3" in t, "код выхода не передан"
+assert "exit_test()" not in t, "эхо введенной команды не убрано"
 _, t = tool("workdesk_run", {"command": "whoami && pwd"})
 assert "root" in t, t
 
@@ -91,6 +94,9 @@ tool("workdesk_mouse", {"action": "click", "x": 60, "y": 60})
 tool("workdesk_mouse", {"action": "scroll", "scroll_y": -2})
 tool("workdesk_type", {"text": "workdesk"})
 tool("workdesk_key", {"key": "Enter"})
+time.sleep(1)
+_, t = tool("workdesk_run", {"command": "cat /tmp/typed.txt"})
+assert "workdesk" in t, "набранный текст не дошел до окна на удаленной стороне"
 tool("workdesk_key", {"key": "a", "ctrl": True})
 tool("workdesk_disconnect")
 _, t = tool("workdesk_status")

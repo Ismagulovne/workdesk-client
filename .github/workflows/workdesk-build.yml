@@ -923,3 +923,27 @@ jobs:
         path: |
           mcp-out
           host.log
+  mcp-smoke-windows:
+    name: WorkDesk для Claude Code (MCP) — проверка на Windows
+    needs:
+    - build-for-windows-flutter
+    if: inputs.windows
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        sparse-checkout: .github/mcp-e2e
+    - name: Download Windows files
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: WorkDesk-files-windows-x86_64
+        path: wd
+    - name: Run MCP smoke test
+      shell: bash
+      run: |
+        ls wd | head -50
+        EXE=$(ls wd/*.exe | grep -i -E '/(rustdesk|workdesk)\.exe$' | head -1)
+        echo "exe: $EXE"
+        python .github/mcp-e2e/smoke.py "$EXE"

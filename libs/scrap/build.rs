@@ -244,31 +244,10 @@ fn main() {
     env::remove_var("CARGO_CFG_TARGET_FEATURE");
     env::set_var("CARGO_CFG_TARGET_FEATURE", "crt-static");
 
-    // Skip external codecs on platforms where they're not available (macOS x86_64)
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let out_dir = Path::new(&out_dir);
-
-    if std::env::var("NO_PKG_CONFIG_libyuv").is_err() {
-        find_package("libyuv");
-        gen_vcpkg_package("libyuv", "yuv_ffi.h", "yuv_ffi.rs", ".*");
-    } else {
-        // Create empty yuv_ffi.rs when libyuv is disabled
-        fs::write(out_dir.join("yuv_ffi.rs"), "// libyuv disabled\n").ok();
-    }
-
-    if std::env::var("NO_PKG_CONFIG_libvpx").is_err() {
-        gen_vcpkg_package("libvpx", "vpx_ffi.h", "vpx_ffi.rs", "^[vV].*");
-    } else {
-        // Create empty vpx_ffi.rs when libvpx is disabled
-        fs::write(out_dir.join("vpx_ffi.rs"), "// libvpx disabled\n").ok();
-    }
-
-    if std::env::var("NO_PKG_CONFIG_aom").is_err() {
-        gen_vcpkg_package("aom", "aom_ffi.h", "aom_ffi.rs", "^(aom|AOM|OBU|AV1).*");
-    } else {
-        // Create empty aom_ffi.rs when aom is disabled
-        fs::write(out_dir.join("aom_ffi.rs"), "// aom disabled\n").ok();
-    }
+    find_package("libyuv");
+    gen_vcpkg_package("libvpx", "vpx_ffi.h", "vpx_ffi.rs", "^[vV].*");
+    gen_vcpkg_package("aom", "aom_ffi.h", "aom_ffi.rs", "^(aom|AOM|OBU|AV1).*");
+    gen_vcpkg_package("libyuv", "yuv_ffi.h", "yuv_ffi.rs", ".*");
     // ffmpeg();
 
     if target_os == "ios" {

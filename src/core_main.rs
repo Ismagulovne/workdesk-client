@@ -47,6 +47,10 @@ pub fn core_main() -> Option<CoreMainAction> {
         return None;
     }
     crate::load_custom_client();
+    if std::env::args().nth(1).as_deref() == Some("--mcp") {
+        crate::mcp::run();
+        return None;
+    }
     #[cfg(windows)]
     if !crate::platform::windows::bootstrap() {
         // return None to terminate the process

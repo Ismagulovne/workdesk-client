@@ -479,23 +479,6 @@ jobs:
         JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
       run: |
         export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
-        # Maven Central с раннеров GitHub отвечал 404 на asm 9.1 / javawriter 2.5.0 (19.11.2026) — зеркало Google первым
-        mkdir -p ~/.gradle/init.d
-        cat > ~/.gradle/init.d/maven-mirror.gradle <<'EOF'
-        def mirror = 'https://maven-central.storage-download.googleapis.com/maven2/'
-        def first = { handler ->
-          def r = handler.maven { name = 'mavenCentralGoogleMirror'; url = mirror }
-          handler.remove(r)
-          handler.add(0, r)
-        }
-        beforeSettings { s -> first(s.pluginManagement.repositories) }
-        settingsEvaluated { s -> first(s.dependencyResolutionManagement.repositories) }
-        allprojects {
-          first(buildscript.repositories)
-          first(repositories)
-        }
-        EOF
-        cat ~/.gradle/init.d/maven-mirror.gradle
         # Increase Gradle JVM memory for CI builds
         sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
         # temporary use debug sign config

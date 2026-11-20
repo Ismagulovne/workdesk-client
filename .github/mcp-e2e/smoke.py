@@ -1,4 +1,4 @@
-"""Smoke-проверка `--mcp` на Windows: stdio оконного exe, список инструментов, связь с сервером WorkDesk.
+"""Smoke-проверка `--mcp` (Windows, macOS): stdio оконного exe, список инструментов, связь с сервером WorkDesk.
 
 python smoke.py <путь к exe>
 """
@@ -42,4 +42,4 @@ print("connect к несуществующему ID:", text)
 assert res.get("isError"), "подключение к несуществующему ID должно вернуть ошибку"
 proc.stdin.close()
 proc.wait(timeout=30)
-print("SMOKE: Windows --mcp работает")
+print(f"SMOKE: --mcp работает ({sys.platform})")

@@ -170,6 +170,8 @@ jobs:
       env:
         VCPKG_DEFAULT_HOST_TRIPLET: ${{ matrix.job.vcpkg-triplet }}
       run: |
+        # Патчи, которые github.com/<repo>/commit/*.patch отдает с ошибкой 503; SHA512 проверяет vcpkg
+        mkdir -p "$VCPKG_ROOT/downloads" && cp .github/vcpkg-downloads/*.patch "$VCPKG_ROOT/downloads/"
         if ! $VCPKG_ROOT/vcpkg \
           install \
           --triplet ${{ matrix.job.vcpkg-triplet }} \
@@ -658,6 +660,8 @@ jobs:
       if: matrix.job.arch == 'x86_64' || env.UPLOAD_ARTIFACT == 'true'
       run: |
         sudo apt install -y libva-dev && apt show libva-dev
+        # Патчи, которые github.com/<repo>/commit/*.patch отдает с ошибкой 503; SHA512 проверяет vcpkg
+        mkdir -p "$VCPKG_ROOT/downloads" && cp .github/vcpkg-downloads/*.patch "$VCPKG_ROOT/downloads/"
         if ! $VCPKG_ROOT/vcpkg \
           install \
           --triplet ${{ matrix.job.vcpkg-triplet }} \

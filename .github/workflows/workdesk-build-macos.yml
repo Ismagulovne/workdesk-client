@@ -154,6 +154,7 @@ jobs:
 
       - name: Install vcpkg dependencies
         run: |
+          mkdir -p "$VCPKG_ROOT/downloads" && cp .github/vcpkg-downloads/*.patch "$VCPKG_ROOT/downloads/" || true
           if ! $VCPKG_ROOT/vcpkg \
             install \
             --x-install-root="$VCPKG_ROOT/installed"; then
@@ -189,6 +190,14 @@ jobs:
             echo "MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}" >> "$GITHUB_ENV"
           fi
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
+
+      - name: WorkDesk для Claude Code (MCP) — проверка на macOS
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          EXE=./flutter/build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/RustDesk
+          ls -l "$EXE"
+          python3 .github/mcp-e2e/smoke.py "$EXE"
 
       - name: create unsigned dmg
         run: |

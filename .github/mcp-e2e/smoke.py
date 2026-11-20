@@ -19,7 +19,10 @@ def call(method, params=None):
     line = proc.stdout.readline()
     if not line:
         raise SystemExit(f"{method}: MCP-сервер закрыл stdout (код {proc.poll()})")
-    msg = json.loads(line)
+    try:
+        msg = json.loads(line)
+    except json.JSONDecodeError:
+        raise SystemExit(f"{method}: в stdout не JSON (ломает MCP): {line!r}")
     assert msg.get("id") == n, msg
     if "error" in msg:
         raise SystemExit(f"{method}: {msg['error']}")

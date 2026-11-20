@@ -718,7 +718,7 @@ fn trim_echo(body: &str, command: &str) -> String {
     tail(out.join("\n").trim_matches('\n'), 50000)
 }
 
-fn reply(out: &mut impl Write, id: &Value, result: Result<Value, (i64, String)>) {
+fn reply(out: &mut dyn Write, id: &Value, result: Result<Value, (i64, String)>) {
     let msg = match result {
         Ok(r) => json!({ "jsonrpc": "2.0", "id": id, "result": r }),
         Err((code, m)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": m } }),
@@ -727,17 +727,61 @@ fn reply(out: &mut impl Write, id: &Value, result: Result<Value, (i64, String)>)
     let _ = out.flush();
 }
 
+// Канал MCP — только JSON-RPC. Клиент и библиотеки (в т.ч. C-код через CRT) иногда пишут в stdout,
+// поэтому забираем себе копию stdout, а сам stdout процесса переводим в stderr.
+#[cfg(unix)]
+fn take_stdout() -> Option<std::fs::File> {
+    use hbb_common::libc;
+    use std::os::unix::io::FromRawFd;
+    unsafe {
+        let fd = libc::dup(1);
+        if fd < 0 {
+            return None;
+        }
+        libc::dup2(2, 1);
+        Some(std::fs::File::from_raw_fd(fd))
+    }
+}
+
+#[cfg(windows)]
+fn take_stdout() -> Option<std::fs::File> {
+    use hbb_common::libc;
+    use std::os::windows::io::FromRawHandle;
+    extern "system" {
+        fn GetStdHandle(n: u32) -> *mut std::ffi::c_void;
+        fn SetStdHandle(n: u32, h: *mut std::ffi::c_void) -> i32;
+    }
+    const STD_OUTPUT_HANDLE: u32 = -11i32 as u32;
+    const STD_ERROR_HANDLE: u32 = -12i32 as u32;
+    unsafe {
+        let fd = libc::dup(1);
+        if fd < 0 {
+            return None;
+        }
+        let h = libc::get_osfhandle(fd);
+        if h == -1 {
+            return None;
+        }
+        libc::dup2(2, 1);
+        SetStdHandle(STD_OUTPUT_HANDLE, GetStdHandle(STD_ERROR_HANDLE));
+        Some(std::fs::File::from_raw_handle(h as _))
+    }
+}
+
 pub fn run() {
     let mut server = Server { conns: HashMap::new() };
     let stdin = std::io::stdin();
-    let stdout = std::io::stdout();
+    let mut out: Box<dyn Write> = match take_stdout() {
+        Some(f) => Box::new(f),
+        None => Box::new(std::io::stdout()),
+    };
     for line in stdin.lock().lines() {
         let Ok(line) = line else { break };
         if line.trim().is_empty() {
             continue;
         }
         let Ok(req) = serde_json::from_str::<Value>(&line) else {
-            reply(&mut stdout.lock(), &Value::Null, Err((-32700, "Parse error".to_owned())));
+            reply(&mut out, &Value::Null, Err((-32700, "Parse error".to_owned())));
             continue;
         };
         let Some(id) = req.get("id").cloned() else {
@@ -761,7 +805,7 @@ pub fn run() {
             }
             _ => Err((-32601, format!("Method not found: {}", method))),
         };
-        reply(&mut stdout.lock(), &id, result);
+        reply(&mut out, &id, result);
     }
     for (_, c) in server.conns.drain() {
         close_conn(c);

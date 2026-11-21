@@ -66,6 +66,10 @@ static WS_FALLBACK_SINCE: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::
 const UDP_FIRST_ANSWER_MS: u128 = 20_000;
 const UDP_SILENCE_MS: u128 = 45_000;
 const WS_FALLBACK_RETRY_UDP_MS: u128 = 30 * 60_000;
+// UDP attempts in a row that ended without a single answer from the ID server
+static UDP_FAILED_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+static UDP_ANSWERED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+const UDP_FAILED_ATTEMPTS_MAX: usize = 2;
 
 pub(crate) fn set_ws_fallback(on: bool) {
     let mut since = WS_FALLBACK_SINCE.lock().unwrap();
@@ -494,6 +498,7 @@ impl RendezvousMediator {
                 n = socket.next() => {
                     match n {
                         Some(Ok((bytes, _))) => {
+                            UDP_ANSWERED.store(true, Ordering::SeqCst);
                             if let Ok(msg) = Message::parse_from_bytes(&bytes) {
                                 rz.handle_resp(msg.union, Sink::Framed(&mut socket, &addr), &server, &mut update_latency).await?;
                             } else {
@@ -748,7 +753,19 @@ impl RendezvousMediator {
         {
             Self::start_tcp(server, host).await
         } else {
-            Self::start_udp(server, host).await
+            UDP_ANSWERED.store(false, Ordering::SeqCst);
+            let res = Self::start_udp(server, host).await;
+            if res.is_err() && !UDP_ANSWERED.load(Ordering::SeqCst) {
+                // a firewall may also make every UDP send fail at once, ending each attempt
+                // before the no-answer timer: count the attempts instead
+                if UDP_FAILED_ATTEMPTS.fetch_add(1, Ordering::SeqCst) + 1 >= UDP_FAILED_ATTEMPTS_MAX {
+                    UDP_FAILED_ATTEMPTS.store(0, Ordering::SeqCst);
+                    set_ws_fallback(true);
+                }
+            } else {
+                UDP_FAILED_ATTEMPTS.store(0, Ordering::SeqCst);
+            }
+            res
         }
     }
 

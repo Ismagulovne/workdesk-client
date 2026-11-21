@@ -59,6 +59,39 @@ const MAX_REPORTED_RELAYS: usize = 32;
 // dropped from the configuration stops being accepted.
 const REPORTED_RELAY_TTL: Duration = Duration::from_secs(600);
 
+// WorkDesk: when the ID server does not answer over UDP (UDP 21116 closed by the network), this
+// process switches to WebSocket over 443 (wss://<id server>/ws/id, relay over /ws/relay) and
+// tries UDP again later. The switch lives in this process's memory only.
+static WS_FALLBACK_SINCE: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+const UDP_FIRST_ANSWER_MS: u128 = 20_000;
+const UDP_SILENCE_MS: u128 = 45_000;
+const WS_FALLBACK_RETRY_UDP_MS: u128 = 30 * 60_000;
+
+pub(crate) fn set_ws_fallback(on: bool) {
+    let mut since = WS_FALLBACK_SINCE.lock().unwrap();
+    if on == since.is_some() {
+        return;
+    }
+    let mut overwrite = config::OVERWRITE_SETTINGS.write().unwrap();
+    if on {
+        overwrite.insert(OPTION_ALLOW_WEBSOCKET.to_owned(), "Y".to_owned());
+        *since = Some(Instant::now());
+        log::warn!("The ID server does not answer over UDP, switching to WebSocket");
+    } else {
+        overwrite.remove(OPTION_ALLOW_WEBSOCKET);
+        *since = None;
+        log::info!("Trying UDP to the ID server again");
+    }
+}
+
+fn ws_fallback_active() -> bool {
+    WS_FALLBACK_SINCE.lock().unwrap().is_some()
+}
+
+fn ws_fallback_expired() -> bool {
+    matches!(*WS_FALLBACK_SINCE.lock().unwrap(), Some(t) if t.elapsed().as_millis() > WS_FALLBACK_RETRY_UDP_MS)
+}
+
 fn remember_reported_relay(relay_server: &str, now: Instant) {
     let relay_server = check_port(relay_server, config::RELAY_PORT);
     let mut relays = REPORTED_RELAYS.lock().unwrap();
@@ -427,6 +460,7 @@ impl RendezvousMediator {
         let mut last_register_sent: Option<Instant> = None;
         let mut last_dns_check = Instant::now();
         let mut old_latency = 0;
+        let udp_started = Instant::now();
         let mut ema_latency = 0;
         loop {
             let mut update_latency = || {
@@ -483,6 +517,14 @@ impl RendezvousMediator {
                     // until the operator runs `rustdesk --deploy`.
                     if deploy_register_throttled().await {
                         continue;
+                    }
+                    let no_answer = match last_register_resp {
+                        Some(t) => t.elapsed().as_millis() > UDP_SILENCE_MS,
+                        None => udp_started.elapsed().as_millis() > UDP_FIRST_ANSWER_MS,
+                    };
+                    if no_answer {
+                        set_ws_fallback(true);
+                        bail!("no answer from the ID server over UDP");
                     }
                     let now = Some(Instant::now());
                     let expired = last_register_resp.map(|x| x.elapsed().as_millis() as i64 >= REG_INTERVAL).unwrap_or(true);
@@ -629,7 +671,15 @@ impl RendezvousMediator {
     pub async fn start_tcp(server: ServerPtr, host: String) -> ResultType<()> {
         let host = check_port(&host, RENDEZVOUS_PORT);
         log::info!("start tcp: {}", hbb_common::websocket::check_ws(&host));
-        let mut conn = connect_tcp(host.clone(), CONNECT_TIMEOUT).await?;
+        let mut conn = match connect_tcp(host.clone(), CONNECT_TIMEOUT).await {
+            Ok(conn) => conn,
+            Err(err) => {
+                if ws_fallback_active() {
+                    set_ws_fallback(false);
+                }
+                return Err(err);
+            }
+        };
         let key = crate::get_key(true).await;
         crate::secure_tcp(&mut conn, &key).await?;
         let mut rz = Self {
@@ -666,6 +716,10 @@ impl RendezvousMediator {
                 }
                 _ = timer.tick() => {
                     if SHOULD_EXIT.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    if ws_fallback_expired() {
+                        set_ws_fallback(false);
                         break;
                     }
                     // https://www.emqx.com/en/blog/mqtt-keep-alive

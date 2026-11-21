@@ -824,6 +824,13 @@ impl Client {
         let mut webrtc_offerer = webrtc_offerer.map(OffererGuard::new);
         let mut start = Instant::now();
         let mut socket = connect_tcp(&*rendezvous_server, CONNECT_TIMEOUT).await;
+        // WorkDesk: the network closes TCP 21116 to the ID server, go over WebSocket on 443.
+        #[cfg(not(target_os = "ios"))]
+        if socket.is_err() && !use_ws() {
+            log::warn!("The ID server is unreachable over TCP, switching to WebSocket");
+            crate::rendezvous_mediator::set_ws_fallback(true);
+            socket = connect_tcp(&*rendezvous_server, CONNECT_TIMEOUT).await;
+        }
         debug_assert!(!servers.contains(&rendezvous_server));
         let rtt = start.elapsed();
         log::debug!("TCP connection establishment time used: {:?}", rtt);

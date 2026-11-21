@@ -27,7 +27,7 @@ windows = { version = "0.61", features = [
 native-windows-gui = {version = "1.0", default-features = false, features = ["animation-timer", "image-decoder"]}
 
 [package.metadata.winres]
-LegalCopyright = "(c) 2026 WorkTime.kz - WorkDesk. AGPL-3.0, includes RustDesk components"
+LegalCopyright = "(c) 2026 Nurbolat Ismagulov - WorkDesk. AGPL-3.0, includes RustDesk components"
 ProductName = "WorkDesk"
 OriginalFilename = "WorkDesk.exe"
 FileDescription = "WorkDesk Remote Desktop"

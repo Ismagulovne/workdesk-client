@@ -2647,7 +2647,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '© ${DateTime.now().toString().substring(0, 4)} ИП «WorkTime.kz» — WorkDesk\n$license',
+                            '© ${DateTime.now().toString().substring(0, 4)} Нурболат Исмагулов — WorkDesk\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(

@@ -259,7 +259,7 @@ webrtc-util = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d
 webrtc-sctp = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d30e6e62e4c1a96cee38fdc11f79ef63" }
 
 [package.metadata.winres]
-LegalCopyright = "(c) 2026 WorkTime.kz - WorkDesk. AGPL-3.0, includes RustDesk components"
+LegalCopyright = "(c) 2026 Nurbolat Ismagulov - WorkDesk. AGPL-3.0, includes RustDesk components"
 ProductName = "WorkDesk"
 FileDescription = "WorkDesk Remote Desktop"
 OriginalFilename = "WorkDesk.exe"

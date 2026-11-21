@@ -2517,6 +2517,7 @@ fn workdesk_builtin_config() {
         o.insert("key".to_owned(), "l1vPDdfAzChJ1DI2bPuJjIaiIHJ68LuAFspjSXwzyAg=".to_owned());
         o.insert("allow-auto-update".to_owned(), "N".to_owned());
         o.insert("allow-remote-config-modification".to_owned(), "N".to_owned());
+        o.insert("allow-websocket".to_owned(), "Y".to_owned());
     }
     {
         let mut b = config::BUILTIN_SETTINGS.write().unwrap();

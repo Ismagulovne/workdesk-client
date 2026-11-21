@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "WorkDesk Remote Desktop" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "WorkDesk" "\0"
-            VALUE "LegalCopyright", "Based on RustDesk (c) Purslane Tech Pte. Ltd., AGPL-3.0. WorkDesk changes (c) 2026" "\0"
+            VALUE "LegalCopyright", "(c) 2026 WorkTime.kz - WorkDesk. AGPL-3.0, includes RustDesk components" "\0"
             VALUE "OriginalFilename", "WorkDesk.exe" "\0"
             VALUE "ProductName", "WorkDesk" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

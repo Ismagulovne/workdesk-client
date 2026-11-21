@@ -2621,7 +2621,7 @@ class _AboutState extends State<_About> {
                   child: Text('Проверить обновления', style: linkStyle).marginSymmetric(vertical: 4.0)),
               InkWell(
                   onTap: () {
-                    launchUrlString('https://rustdesk.com/privacy.html');
+                    launchUrlString('https://workdesk.kz/privacy');
                   },
                   child: Text(
                     translate('Privacy Statement'),
@@ -2647,15 +2647,21 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\n$license',
+                            '© ${DateTime.now().toString().substring(0, 4)} ИП «WorkTime.kz» — WorkDesk\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(
-                            translate('Slogan_tip'),
+                            'Удалённый доступ к компьютерам — workdesk.kz',
                             style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white),
-                          )
+                          ),
+                          // WorkDesk: уведомление AGPL-3.0
+                          Text(
+                            'Лицензия AGPL-3.0, без гарантий. Исходный код: workdesk.kz/source. '
+                            'Включает компоненты RustDesk © Purslane Tech Pte. Ltd.',
+                            style: const TextStyle(color: Colors.white70, fontSize: 10),
+                          ),
                         ],
                       ),
                     ),

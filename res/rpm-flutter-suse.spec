@@ -3,7 +3,7 @@ Version:    1.5.3
 Release:    0
 Summary:    RPM package
 License:    AGPL-3.0
-URL:        https://github.com/Ismagulovne/workdesk-client
+URL:        https://workdesk.kz
 Vendor:     WorkDesk <info@worktime.kz>
 Requires:   gtk3 libxcb1 libXfixes3 alsa-utils libXtst6 libva2 gstreamer-plugins-base gstreamer-plugin-pipewire
 Recommends: libayatana-appindicator3-1 xdotool

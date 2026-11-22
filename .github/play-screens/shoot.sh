@@ -34,7 +34,7 @@ shot 04-id 1
 $UI has "Пароль|Password" || adb shell input tap 970 324
 sleep 10
 shot 05-password 1
-$UI tap "Пароль|Password" || true
+# поле пароля уже в фокусе
 adb shell input text "$PEER_PASS"
 sleep 1
 $UI tap "OK|ОК" || adb shell input keyevent 66

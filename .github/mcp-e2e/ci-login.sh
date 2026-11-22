@@ -13,9 +13,12 @@ BODY=$(UUID="$UUID" python3 -c 'import json,os; print(json.dumps({"username": os
 TOKEN=$(curl -fsS -H 'Content-Type: application/json' --data-binary "$BODY" "$API/api/login" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 echo "::add-mask::$TOKEN"
-DIR="$HOME/.config/$APP"
-mkdir -p "$DIR"
-printf '[options]\naccess_token = "%s"\n' "$TOKEN" > "$DIR/${APP}_local.toml"
+# Папка настроек на Linux — ~/.config/<имя программы строчными> (directories-next), файл <Имя>_local.toml
+for DIR in "$HOME/.config/${APP,,}" "$HOME/.config/$APP"; do
+  mkdir -p "$DIR"
+  printf '[options]\naccess_token = "%s"\n' "$TOKEN" > "$DIR/${APP}_local.toml"
+done
+ls -la "$HOME/.config/${APP,,}" || true
 STATUS=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$API/api/workdesk-ai/status")
 echo "Подписка WorkDesk AI: $STATUS"
 echo "$STATUS" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("active") else "подписка WorkDesk AI у учетной записи CI не активна")'

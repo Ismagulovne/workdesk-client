@@ -604,6 +604,11 @@ jobs:
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       with:
         submodules: recursive
+    - name: Java 17
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y openjdk-17-jdk-headless
+        ls /usr/lib/jvm/
     - name: versionCode
       run: |
         test -n "${{ inputs.play_version_code }}" || { echo "Укажите play_version_code"; exit 1; }

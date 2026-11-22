@@ -24,26 +24,21 @@ sleep 25
 shot 00-start 1
 adb logcat -d | grep -iE "FATAL|SIGILL|AndroidRuntime" | tail -20 > "$OUT/logcat-start.txt" || true
 
-# Настройки и окно входа
-$UI tap "Настройки|Settings" && shot 02-settings
-$UI tap "Войти|Login" && shot 03-login 4
-adb shell input keyevent 4
-sleep 2
-
 # Подключение к демо-компьютеру
-$UI tap "Подключение|Connection|Подключиться|Connect" || true
-sleep 2
-$UI tap "Удалённый ID|Удаленный ID|Remote ID|ID" || true
+$UI tap "Удалённый ID|Удаленный ID|Remote ID" || adb shell input tap 400 324
+sleep 1
 adb shell input text "$PEER_ID"
 sleep 1
+adb shell input keyevent 4
 shot 04-id 1
-adb shell input keyevent 66
-sleep 8
+$UI has "Пароль|Password" || adb shell input tap 970 324
+sleep 10
 shot 05-password 1
 $UI tap "Пароль|Password" || true
 adb shell input text "$PEER_PASS"
+sleep 1
 $UI tap "OK|ОК" || adb shell input keyevent 66
-sleep 15
+sleep 20
 shot 06-session 2
 adb shell input tap 540 1200
 sleep 3
@@ -55,5 +50,9 @@ sleep 2
 $UI tap "OK|ОК|Да|Yes" || true
 sleep 4
 shot 01-home 2
+
+# Настройки и окно входа (в конце: диалог закрывать не нужно)
+$UI tap "Настройки|Settings" && shot 02-settings
+$UI tap "Войти|Login" && sleep 3 && adb shell input text "ivanov" && adb shell input keyevent 4 && shot 03-login 2
 adb logcat -d | grep -iE "FATAL|SIGILL|AndroidRuntime|flutter" | tail -40 > "$OUT/logcat.txt" || true
 ls -la "$OUT"

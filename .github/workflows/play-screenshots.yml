@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       android_run_id:
-        description: ID прогона «сборка Windows, Android и Linux» с APK aarch64
+        description: ID прогона «сборка Windows, Android и Linux» с APK x86_64 (эмулятор)
+        required: true
+        type: string
+      linux_run_id:
+        description: ID прогона с пакетом Linux x86_64 (демо-компьютер)
         required: true
         type: string
 
@@ -25,10 +29,41 @@ jobs:
     - name: APK
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
-        name: WorkDesk-1.5.3-android-aarch64
+        name: WorkDesk-1.5.3-android-x86_64
         path: apk
         run-id: ${{ inputs.android_run_id }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Linux package
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: WorkDesk-1.5.3-linux-x86_64
+        path: pkg
+        run-id: ${{ inputs.linux_run_id }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Демо-компьютер (WorkDesk на Linux, виртуальный экран)
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y xvfb xterm x11-xserver-utils ./pkg/workdesk-1.5.3-x86_64.deb
+        sudo systemctl stop workdesk || true
+        sudo systemctl disable workdesk || true
+        sudo pkill -f 'workdesk --' || true
+        Xvfb :99 -screen 0 1280x800x24 -ac &
+        sleep 2
+        DISPLAY=:99 xsetroot -solid '#4B2BE0'
+        DISPLAY=:99 xterm -geometry 90x24+150+150 -fa Monospace -fs 13 -bg white -fg '#1b1b1f' -T 'Демо-компьютер' -e bash -c 'echo "WorkDesk — демо-компьютер"; echo; uname -sr; echo; echo "Удалённый доступ к компьютерам компании"; sleep infinity' &
+        sudo -b env DISPLAY=:99 HOME=/root workdesk --server > host.log 2>&1
+        PASS="Demo-$(openssl rand -hex 4)"
+        echo "::add-mask::$PASS"
+        for i in $(seq 1 60); do
+          ID=$(sudo env HOME=/root workdesk --get-id 2>/dev/null | tr -dc '0-9')
+          [ -n "$ID" ] && break
+          sleep 2
+        done
+        test -n "$ID"
+        sudo env HOME=/root workdesk --password "$PASS"
+        echo "PEER_ID=$ID" >> "$GITHUB_ENV"
+        echo "PEER_PASS=$PASS" >> "$GITHUB_ENV"
+        sleep 20
     - name: KVM
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

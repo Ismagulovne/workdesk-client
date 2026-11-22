@@ -13,15 +13,13 @@ BODY=$(UUID="$UUID" python3 -c 'import json,os; print(json.dumps({"username": os
 TOKEN=$(curl -fsS -H 'Content-Type: application/json' --data-binary "$BODY" "$API/api/login" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 echo "::add-mask::$TOKEN"
-# Папка настроек на Linux — ~/.config/<имя программы строчными> (directories-next), файл <Имя>_local.toml
-# Папку могла создать служба WorkDesk от root — пишем через sudo и отдаем текущему пользователю
-SUDO=""; command -v sudo >/dev/null && SUDO="sudo"
-for DIR in "$HOME/.config/${APP,,}" "$HOME/.config/$APP"; do
-  $SUDO mkdir -p "$DIR"
-  printf '[options]\naccess_token = "%s"\n' "$TOKEN" | $SUDO tee "$DIR/${APP}_local.toml" >/dev/null
-  $SUDO chown -R "$(id -u):$(id -g)" "$DIR"
-done
-ls -la "$HOME/.config/${APP,,}" || true
+# Папка настроек на Linux — ~/.config/<имя программы строчными> (directories-next), файл <Имя>_local.toml.
+# Клиент получает свой HOME (MCP_HOME): служба WorkDesk от root хранит настройки в домашней папке пользователя
+# (~/.config/workdesk), и клиент с тем же каталогом подключался бы к хосту с его же ID и ключами.
+H="${MCP_HOME:-$HOME}"
+DIR="$H/.config/${APP,,}"
+mkdir -p "$DIR"
+printf '[options]\naccess_token = "%s"\n' "$TOKEN" > "$DIR/${APP}_local.toml"
 STATUS=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$API/api/workdesk-ai/status")
 echo "Подписка WorkDesk AI: $STATUS"
 echo "$STATUS" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("active") else "подписка WorkDesk AI у учетной записи CI не активна")'

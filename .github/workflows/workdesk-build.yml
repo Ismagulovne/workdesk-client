@@ -1068,10 +1068,12 @@ jobs:
       env:
         WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
+        MCP_HOME: ${{ runner.temp }}/mcp-home
       run: bash .github/mcp-e2e/ci-login.sh
     - name: Run MCP client as Claude Code would
       run: |
-        DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+        # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
+        HOME="$RUNNER_TEMP/mcp-home" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -1145,10 +1147,12 @@ jobs:
       env:
         WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
+        MCP_HOME: ${{ runner.temp }}/mcp-home
       run: bash .github/mcp-e2e/ci-login.sh
     - name: Run MCP client as Claude Code would
       run: |
-        DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+        # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
+        HOME="$RUNNER_TEMP/mcp-home" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -1224,10 +1228,12 @@ jobs:
       env:
         WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
+        MCP_HOME: ${{ runner.temp }}/mcp-home
       run: bash .github/mcp-e2e/ci-login.sh
     - name: Run MCP client as Claude Code would
       run: |
-        DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+        # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
+        HOME="$RUNNER_TEMP/mcp-home" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

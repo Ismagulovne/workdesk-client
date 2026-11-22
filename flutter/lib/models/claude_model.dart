@@ -58,13 +58,13 @@ class ClaudeRelay extends ChangeNotifier {
     if (_ws != null || connecting) return;
     final token = bind.mainGetLocalOption(key: 'access_token');
     if (token.isEmpty) {
-      error = 'Войдите в учетную запись WorkDesk';
+      error = 'Sign in to your WorkDesk account';
       notifyListeners();
       return;
     }
     final url = await _url();
     if (url == null) {
-      error = 'Не задан сервер WorkDesk';
+      error = 'WorkDesk server is not set';
       notifyListeners();
       return;
     }
@@ -79,8 +79,8 @@ class ClaudeRelay extends ChangeNotifier {
       ws.listen(_onData, onDone: _onDone, onError: (_) => _onDone(), cancelOnError: true);
     } catch (e) {
       error = e is WebSocketException && '$e'.contains('401')
-          ? 'Сеанс WorkDesk истек, войдите заново'
-          : 'Нет связи с сервером WorkDesk';
+          ? 'WorkDesk session expired, sign in again'
+          : 'No connection to the WorkDesk server';
       _scheduleRetry();
     } finally {
       connecting = false;
@@ -137,7 +137,7 @@ class ClaudeRelay extends ChangeNotifier {
         .timeout(const Duration(seconds: 20));
     send({'t': 'open', 'device': device, 'mode': mode, 'permission': permission, 'cwd': cwd, 'resume': resume, 'cols': cols, 'rows': rows});
     final m = await first;
-    if (m['t'] != 'opened') throw '${m['message'] ?? m['error'] ?? 'Не удалось открыть сеанс'}';
+    if (m['t'] != 'opened') throw '${m['message'] ?? m['error'] ?? 'Could not open the session'}';
     return '${m['sid']}';
   }
 }

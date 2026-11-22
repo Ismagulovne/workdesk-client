@@ -11,6 +11,11 @@ on:
         description: ID прогона с пакетом Linux x86_64 (демо-компьютер)
         required: true
         type: string
+      locale:
+        description: Язык телефона (ru-RU, en-US, de-DE, ja-JP …)
+        required: false
+        default: ru-RU
+        type: string
 
 permissions:
   contents: read
@@ -78,7 +83,7 @@ jobs:
         arch: x86_64
         profile: pixel_6
         disable-animations: true
-        script: bash .github/play-screens/shoot.sh
+        script: LOCALE=${{ inputs.locale }} bash .github/play-screens/shoot.sh
     - name: Скриншоты
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -6,15 +6,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
+import '../../common.dart';
 import '../../common/widgets/login.dart';
 import '../../models/claude_model.dart';
 import '../../models/platform_model.dart';
 import 'home_page.dart';
 
+// Режимы разрешений; подписи переводятся через translate() (ключи в src/lang/*.rs)
 const _permissionTitles = {
-  'default': 'Спрашивать перед действиями',
-  'acceptEdits': 'Разрешить правку файлов',
-  'plan': 'Только чтение и план',
+  'default': 'Ask before actions',
+  'acceptEdits': 'Allow file edits',
+  'plan': 'Read-only and plan',
 };
 
 class ClaudePage extends StatefulWidget implements PageShape {
@@ -61,17 +63,16 @@ class _ClaudePageState extends State<ClaudePage> {
   @override
   Widget build(BuildContext context) {
     if (bind.mainGetLocalOption(key: 'access_token').isEmpty) {
-      return _hint(Icons.person, 'Войдите в учетную запись WorkDesk, чтобы работать с Claude на своих компьютерах.',
-          action: ElevatedButton(onPressed: _login, child: const Text('Войти')));
+      return _hint(Icons.person, translate('claude-login-hint'),
+          action: ElevatedButton(onPressed: _login, child: Text(translate('Login'))));
     }
     if (!relay.connected) {
-      return _hint(Icons.cloud_off, relay.connecting ? 'Подключение к серверу…' : relay.error,
-          action: relay.connecting ? const CircularProgressIndicator() : TextButton(onPressed: relay.connect, child: const Text('Повторить')));
+      return _hint(Icons.cloud_off, relay.connecting ? translate('Connecting to the server…') : translate(relay.error),
+          action: relay.connecting ? const CircularProgressIndicator() : TextButton(onPressed: relay.connect, child: Text(translate('Retry'))));
     }
     if (relay.agents.isEmpty) {
       return _hint(Icons.computer,
-          'Нет компьютеров в сети.\n\nНа компьютере: установите Claude Code и войдите в него своим аккаунтом, '
-          'затем запустите агент WorkDesk+Claude:\nworkdesk-claude login\nworkdesk-claude run');
+          '${translate('claude-no-agents-hint')}\nworkdesk-claude login\nworkdesk-claude run');
     }
     return RefreshIndicator(
       onRefresh: () async => relay.send({'t': 'list'}),
@@ -85,7 +86,7 @@ class _ClaudePageState extends State<ClaudePage> {
               title: Text(a.title),
               subtitle: Text([
                 'ID ${a.device} · ${a.os}',
-                ready ? 'Claude Code ${a.claudeVersion}${a.claudeLoggedIn ? '' : ' — проверьте вход в Claude'}' : 'Claude Code не установлен',
+                ready ? 'Claude Code ${a.claudeVersion}${a.claudeLoggedIn ? '' : ' — ${translate('check the Claude sign-in')}'}' : translate('Claude Code is not installed'),
               ].join('\n')),
               isThreeLine: true,
               enabled: ready,
@@ -117,8 +118,8 @@ class _ClaudePageState extends State<ClaudePage> {
           ListTile(title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.bold))),
           ..._permissionTitles.entries.map((e) => ListTile(
                 leading: const Icon(Icons.chat),
-                title: const Text('Чат с Claude'),
-                subtitle: Text(e.value),
+                title: Text(translate('Chat with Claude')),
+                subtitle: Text(translate(e.value)),
                 onTap: () {
                   Navigator.pop(ctx);
                   Navigator.push(context, MaterialPageRoute(builder: (_) => ClaudeChatPage(agent: a, permission: e.key)));
@@ -126,7 +127,7 @@ class _ClaudePageState extends State<ClaudePage> {
               )),
           ListTile(
             leading: const Icon(Icons.terminal),
-            title: const Text('Терминал Claude Code'),
+            title: Text(translate('Claude Code terminal')),
             onTap: () {
               Navigator.pop(ctx);
               Navigator.push(context, MaterialPageRoute(builder: (_) => ClaudeTerminalPage(agent: a)));
@@ -174,9 +175,9 @@ class _ClaudeChatPageState extends State<ClaudeChatPage> {
   Future<void> _open() async {
     try {
       sid = await relay.open(widget.agent.device, 'chat', permission: widget.permission, cwd: widget.agent.cwd);
-      _add(_Item('info', 'Папка: ${widget.agent.cwd}\n${_permissionTitles[widget.permission]}'));
+      _add(_Item('info', '${translate('Folder')}: ${widget.agent.cwd}\n${translate(_permissionTitles[widget.permission] ?? '')}'));
     } catch (e) {
-      _add(_Item('error', '$e'));
+      _add(_Item('error', translate('$e')));
     }
   }
 
@@ -198,7 +199,7 @@ class _ClaudeChatPageState extends State<ClaudeChatPage> {
   void _onMessage(Map<String, dynamic> m) {
     if (m['t'] == 'disconnected') {
       setState(() => busy = false);
-      return _add(_Item('error', 'Связь с сервером потеряна'));
+      return _add(_Item('error', translate('Connection to the server lost')));
     }
     if (m['sid'] != sid) return;
     switch (m['t']) {
@@ -210,7 +211,7 @@ class _ClaudeChatPageState extends State<ClaudeChatPage> {
         break;
       case 'exit':
         setState(() => busy = false);
-        _add(_Item('error', '${m['error'] ?? 'Сеанс завершен'}'));
+        _add(_Item('error', '${m['error'] ?? translate('Session ended')}'));
         break;
       case 'error':
         _add(_Item('error', '${m['message']}'));
@@ -228,11 +229,11 @@ class _ClaudeChatPageState extends State<ClaudeChatPage> {
       }
     } else if (type == 'result') {
       setState(() => busy = false);
-      if (ev['is_error'] == true) _add(_Item('error', '${ev['result'] ?? 'Ошибка Claude Code'}'));
+      if (ev['is_error'] == true) _add(_Item('error', '${ev['result'] ?? translate('Claude Code error')}'));
     } else if (type == 'workdesk') {
       setState(() => busy = false);
       if (ev['subtype'] == 'error') _add(_Item('error', '${ev['message']}'));
-      if (ev['subtype'] == 'interrupted') _add(_Item('info', 'Остановлено'));
+      if (ev['subtype'] == 'interrupted') _add(_Item('info', translate('Stopped')));
     }
   }
 
@@ -246,16 +247,16 @@ class _ClaudeChatPageState extends State<ClaudeChatPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text('Разрешить: ${m['tool']}?'),
-        content: SingleChildScrollView(child: SelectableText('Компьютер: ${widget.agent.title}\n\n${_short(m['input'])}')),
+        title: Text('${translate('claude-allow-tool')}: ${m['tool']}?'),
+        content: SingleChildScrollView(child: SelectableText('${translate('Computer')}: ${widget.agent.title}\n\n${_short(m['input'])}')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Запретить')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Разрешить')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(translate('claude-deny-tool'))),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(translate('claude-allow-tool'))),
         ],
       ),
     );
     relay.send({'t': 'answer', 'sid': sid, 'id': m['id'], 'allow': allow == true});
-    _add(_Item('info', '${m['tool']}: ${allow == true ? 'разрешено' : 'запрещено'}'));
+    _add(_Item('info', '${m['tool']}: ${translate(allow == true ? 'claude-allowed' : 'claude-denied')}'));
     if (allow == true) setState(() => busy = true);
   }
 
@@ -273,7 +274,7 @@ class _ClaudeChatPageState extends State<ClaudeChatPage> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text('Claude · ${widget.agent.title}'), actions: [
-        if (busy) IconButton(tooltip: 'Остановить', icon: const Icon(Icons.stop_circle), onPressed: () => relay.send({'t': 'interrupt', 'sid': sid})),
+        if (busy) IconButton(tooltip: translate('claude-stop'), icon: const Icon(Icons.stop_circle), onPressed: () => relay.send({'t': 'interrupt', 'sid': sid})),
       ]),
       body: Column(children: [
         Expanded(
@@ -319,7 +320,7 @@ class _ClaudeChatPageState extends State<ClaudeChatPage> {
                   minLines: 1,
                   maxLines: 5,
                   textInputAction: TextInputAction.newline,
-                  decoration: const InputDecoration(hintText: 'Задача для Claude на этом компьютере', border: OutlineInputBorder()),
+                  decoration: InputDecoration(hintText: translate('Task for Claude on this computer'), border: const OutlineInputBorder()),
                 ),
               ),
               IconButton(icon: const Icon(Icons.send), onPressed: sid == null ? null : _send),
@@ -367,15 +368,15 @@ class _ClaudeTerminalPageState extends State<ClaudeTerminalPage> {
     try {
       sid = await relay.open(widget.agent.device, 'term', cwd: widget.agent.cwd, cols: cols, rows: rows);
     } catch (e) {
-      terminal.write('\r\n$e\r\n');
+      terminal.write('\r\n${translate('$e')}\r\n');
     }
   }
 
   void _onMessage(Map<String, dynamic> m) {
-    if (m['t'] == 'disconnected') return terminal.write('\r\n[Связь с сервером потеряна]\r\n');
+    if (m['t'] == 'disconnected') return terminal.write('\r\n[${translate('Connection to the server lost')}]\r\n');
     if (m['sid'] != sid) return;
     if (m['t'] == 'out') terminal.write(utf8.decode(base64Decode('${m['data']}'), allowMalformed: true));
-    if (m['t'] == 'exit') terminal.write('\r\n[${m['error'] ?? 'Claude Code завершил работу'}]\r\n');
+    if (m['t'] == 'exit') terminal.write('\r\n[${m['error'] ?? translate('Claude Code exited')}]\r\n');
   }
 
   @override
@@ -392,7 +393,7 @@ class _ClaudeTerminalPageState extends State<ClaudeTerminalPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Терминал · ${widget.agent.title}')),
+      appBar: AppBar(title: Text('${translate('claude-terminal')} · ${widget.agent.title}')),
       body: SafeArea(
         child: Column(children: [
           Expanded(child: TerminalView(terminal, autofocus: true)),

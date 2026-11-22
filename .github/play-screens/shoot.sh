@@ -11,7 +11,7 @@ shot() { sleep "${2:-3}"; adb exec-out screencap -p > "$OUT/$1.png"; $UI dump "$
 # русский интерфейс
 adb root || true
 sleep 3
-adb shell "setprop persist.sys.locale ru-RU; setprop ctl.restart zygote" || true
+adb shell "setprop persist.sys.locale ${LOCALE:-ru-RU}; setprop ctl.restart zygote" || true
 sleep 20
 adb wait-for-device
 until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 2; done
@@ -23,6 +23,11 @@ adb shell monkey -p kz.workdesk.app -c android.intent.category.LAUNCHER 1
 sleep 25
 shot 00-start 1
 adb logcat -d | grep -iE "FATAL|SIGILL|AndroidRuntime" | tail -20 > "$OUT/logcat-start.txt" || true
+
+# Вкладка Claude (без входа — подсказка и кнопка входа на языке телефона)
+$UI tap "Claude" && shot 08-claude 3
+$UI tap "Подключение|Connection|Verbindung|Conexión|Connexion|接続|连接" || adb shell input tap 150 2230
+sleep 2
 
 # Подключение к демо-компьютеру
 $UI tap "Удалённый ID|Удаленный ID|Remote ID" || adb shell input tap 400 324

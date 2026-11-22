@@ -105,7 +105,7 @@ jobs:
     - name: curl
       run: |
         if command -v apt-get; then apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null;
-        elif command -v zypper; then zypper --non-interactive install -y curl gzip >/dev/null;
+        elif command -v zypper; then zypper --non-interactive install -y curl gzip systemd desktop-file-utils >/dev/null;  # как на обычной системе: скрипты пакета вызывают systemctl
         else (dnf install -y curl-minimal || dnf install -y curl) >/dev/null 2>&1 || true; fi
     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       if: ${{ !inputs.live }}

@@ -1,4 +1,4 @@
-// WorkDesk для Claude Code: `WorkDesk --mcp` — MCP-сервер (JSON-RPC по stdio).
+// WorkDesk AI: `WorkDesk --mcp` — MCP-сервер для Claude Code (JSON-RPC по stdio). Только по подписке WorkDesk AI.
 // Это еще один «интерфейс» сеанса рядом с Flutter и Sciter: подключение идет по обычному протоколу,
 // удаленная сторона видит обычное входящее подключение и может его разорвать.
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
 };
 use base::message_proto::*;
 use hbb_common::{
-    config::PeerConfig,
+    config::{LocalConfig, PeerConfig},
     rendezvous_proto::ConnType,
 };
 use serde_json::{json, Value};
@@ -241,6 +241,53 @@ fn wait_connected(h: &McpHandler, timeout: Duration) -> Result<(), String> {
 
 pub struct Server {
     conns: HashMap<String, Conn>,
+    /// Когда сервер WorkDesk последний раз подтвердил подписку WorkDesk AI (проверка не чаще раза в 10 минут)
+    ai_checked: Option<Instant>,
+}
+
+const AI_RECHECK: Duration = Duration::from_secs(600);
+
+/// Подписка WorkDesk AI: программа должна быть войдена в учетную запись WorkDesk компании с активной подпиской.
+/// Сервер WorkDesk отвечает на GET <api-server>/api/workdesk-ai/status { active, until, reason }.
+fn check_ai_subscription() -> Result<(), String> {
+    let token = LocalConfig::get_option("access_token");
+    if token.is_empty() {
+        return Err("WorkDesk AI работает по подписке. Войдите в учетную запись WorkDesk в этой программе                     (Настройки → Учетная запись) и повторите."
+            .to_owned());
+    }
+    let api = crate::ui_interface::get_api_server();
+    let api = api.trim_end_matches('/').to_owned();
+    if api.is_empty() {
+        return Err("Не задан сервер WorkDesk: подписку WorkDesk AI проверить нельзя.".to_owned());
+    }
+    let url = format!("{}/api/workdesk-ai/status", api);
+    // Синхронный HTTP-клиент — в отдельном потоке: здесь не должно быть контекста tokio
+    let res = std::thread::spawn(move || -> Result<(u16, String), String> {
+        let client = crate::hbbs_http::create_http_client_with_url(&url);
+        let r = client
+            .get(&url)
+            .bearer_auth(&token)
+            .timeout(Duration::from_secs(20))
+            .send()
+            .map_err(|e| e.to_string())?;
+        let code = r.status().as_u16();
+        Ok((code, r.text().unwrap_or_default()))
+    })
+    .join()
+    .map_err(|_| "сбой проверки подписки WorkDesk AI".to_owned())?;
+    match res {
+        Err(e) => Err(format!("Не удалось проверить подписку WorkDesk AI на сервере {}: {}", api, e)),
+        Ok((401, _)) => Err("Сеанс WorkDesk истек. Войдите в учетную запись WorkDesk заново и повторите.".to_owned()),
+        Ok((200, body)) => {
+            let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+            if v["active"].as_bool() == Some(true) {
+                Ok(())
+            } else {
+                Err(v["reason"].as_str().unwrap_or("Подписка WorkDesk AI не активна.").to_owned())
+            }
+        }
+        Ok((code, _)) => Err(format!("Сервер WorkDesk ответил {} на проверку подписки WorkDesk AI.", code)),
+    }
 }
 
 fn text(s: impl Into<String>) -> Value {
@@ -437,6 +484,10 @@ impl Server {
 
     fn connect(&mut self, a: &Value) -> Result<Value, String> {
         let id = arg_str(a, "id").ok_or("Укажите id устройства.")?.replace(' ', "");
+        if self.ai_checked.map_or(true, |t| t.elapsed() > AI_RECHECK) {
+            check_ai_subscription()?;
+            self.ai_checked = Some(Instant::now());
+        }
         if let Some(c) = self.conns.get(&id) {
             let st = c.dh.st();
             if st.connected && !st.closed {
@@ -769,7 +820,7 @@ fn take_stdout() -> Option<std::fs::File> {
 }
 
 pub fn run() {
-    let mut server = Server { conns: HashMap::new() };
+    let mut server = Server { conns: HashMap::new(), ai_checked: None };
     let stdin = std::io::stdin();
     let mut out: Box<dyn Write> = match take_stdout() {
         Some(f) => Box::new(f),

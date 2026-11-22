@@ -3,6 +3,7 @@
 python smoke.py <путь к exe>
 """
 import json
+import os
 import subprocess
 import sys
 
@@ -40,6 +41,9 @@ res = call("tools/call", {"name": "workdesk_connect", "arguments": {"id": "10000
 text = res["content"][0]["text"]
 print("connect к несуществующему ID:", text)
 assert res.get("isError"), "подключение к несуществующему ID должно вернуть ошибку"
+expect = os.environ.get("SMOKE_EXPECT", "")
+if expect:  # WorkDesk AI без входа: отказ по подписке, до попытки подключения
+    assert expect in text, f"ожидалось «{expect}» в ответе: {text}"
 proc.stdin.close()
 proc.wait(timeout=30)
 print(f"SMOKE: --mcp работает ({sys.platform})")

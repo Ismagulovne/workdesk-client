@@ -8,7 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../common.dart' show getHttpHeaders;
 import '../models/platform_model.dart';
+import 'workdesk_edition.dart';
 
 String _workdeskPlatform() {
   if (Platform.isAndroid) return 'android';
@@ -28,16 +30,21 @@ Future<void> workdeskCheckUpdate(BuildContext context) async {
   String? page;
   try {
     if (api.isEmpty) throw Exception('не задан сервер');
+    // WorkDesk AI проверяет свои сборки (сервер отдает их только при подписке, по токену учетной записи)
+    final edition = kWorkdeskAi ? '&edition=ai' : '';
     final r = await http
-        .get(Uri.parse('$api/api/workdesk/update?platform=${_workdeskPlatform()}'))
+        .get(Uri.parse('$api/api/workdesk/update?platform=${_workdeskPlatform()}$edition'),
+            headers: kWorkdeskAi ? getHttpHeaders() : null)
         .timeout(const Duration(seconds: 15));
     if (r.statusCode != 200) throw Exception('HTTP ${r.statusCode}');
     final d = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
     page = d['page'] as String?;
     final latest = (d['build'] ?? '').toString();
     if (d['url'] == null || latest.isEmpty) {
-      title = 'Обновление WorkDesk';
-      text = 'Для этой системы на сервере пока нет файла обновления.';
+      title = kWorkdeskAi ? 'Обновление WorkDesk AI' : 'Обновление WorkDesk';
+      text = kWorkdeskAi
+          ? 'Сборок WorkDesk AI для этой системы нет, или не активна подписка: войдите в учетную запись WorkDesk.'
+          : 'Для этой системы на сервере пока нет файла обновления.';
     } else if (latest.compareTo(buildDate) > 0) {
       title = 'Доступно обновление';
       text = 'Новая сборка WorkDesk от $latest (у вас — от $buildDate).\n'

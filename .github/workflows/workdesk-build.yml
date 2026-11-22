@@ -1,8 +1,16 @@
 # Сгенерировано client/prepare_fork.py проекта WorkDesk из flutter-build.yml RustDesk 1.5.3. Запуск: Actions → «WorkDesk — сборка Windows, Android и Linux» → Run workflow.
 name: WorkDesk — сборка Windows, Android и Linux
+run-name: ${{ inputs.edition == 'ai' && 'WorkDesk AI' || 'WorkDesk' }} — сборка (${{ github.ref_name }})
 'on':
   workflow_dispatch:
     inputs:
+      edition:
+        description: 'Продукт: workdesk — обычный WorkDesk (без Claude); ai — WorkDesk AI (Claude Code, по подписке)'
+        type: choice
+        options:
+        - workdesk
+        - ai
+        default: workdesk
       windows:
         description: Windows x64 (EXE и MSI)
         type: boolean
@@ -97,6 +105,10 @@ jobs:
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       with:
         submodules: recursive
+    - name: WorkDesk AI — включить связку с Claude Code
+      if: inputs.edition == 'ai'
+      shell: bash
+      run: python3 .github/workdesk-ai/enable.py
     - name: Restore bridge files
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
@@ -396,6 +408,10 @@ jobs:
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       with:
         submodules: recursive
+    - name: WorkDesk AI — включить связку с Claude Code
+      if: inputs.edition == 'ai'
+      shell: bash
+      run: python3 .github/workdesk-ai/enable.py
     - name: Install flutter
       uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
       with:
@@ -604,6 +620,10 @@ jobs:
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       with:
         submodules: recursive
+    - name: WorkDesk AI — включить связку с Claude Code
+      if: inputs.edition == 'ai'
+      shell: bash
+      run: python3 .github/workdesk-ai/enable.py
     - name: Java 17
       run: |
         sudo apt-get update -y
@@ -732,6 +752,10 @@ jobs:
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       with:
         submodules: recursive
+    - name: WorkDesk AI — включить связку с Claude Code
+      if: inputs.edition == 'ai'
+      shell: bash
+      run: python3 .github/workdesk-ai/enable.py
     - name: Set Swap Space
       uses: pierotofy/set-swap-space@49819abfb41bd9b44fb781159c033dba90353a7c
       with:
@@ -996,7 +1020,7 @@ jobs:
     name: WorkDesk для Claude Code (MCP) — e2e на Linux
     needs:
     - build-for-linux
-    if: inputs.linux
+    if: inputs.linux && inputs.edition == 'ai'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -1035,6 +1059,16 @@ jobs:
         sudo env HOME=/root workdesk --password "$PASS"
         echo "PEER_ID=$ID" >> "$GITHUB_ENV"
         echo "Хост готов, ID $ID"
+    - name: WorkDesk AI без подписки — подключение запрещено
+      env:
+        PYTHONIOENCODING: utf-8
+        SMOKE_EXPECT: по подписке
+      run: python3 .github/mcp-e2e/smoke.py workdesk
+    - name: Вход в WorkDesk AI (служебная учетная запись CI с подпиской)
+      env:
+        WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
+        WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
+      run: bash .github/mcp-e2e/ci-login.sh
     - name: Run MCP client as Claude Code would
       run: |
         DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
@@ -1050,7 +1084,7 @@ jobs:
     name: WorkDesk e2e — закрыты UDP 21116 и TCP 21115-21117 (WebSocket через 443)
     needs:
     - build-for-linux
-    if: inputs.linux
+    if: inputs.linux && inputs.edition == 'ai'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -1102,6 +1136,16 @@ jobs:
         sudo grep -rih -E 'websocket|start tcp|start udp|ID server' /root/.local/share/logs 2>/dev/null | tail -20 || true
         grep -i -E 'websocket|start tcp|udp' host.log | tail -20 || true
         sleep 15
+    - name: WorkDesk AI без подписки — подключение запрещено
+      env:
+        PYTHONIOENCODING: utf-8
+        SMOKE_EXPECT: по подписке
+      run: python3 .github/mcp-e2e/smoke.py workdesk
+    - name: Вход в WorkDesk AI (служебная учетная запись CI с подпиской)
+      env:
+        WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
+        WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
+      run: bash .github/mcp-e2e/ci-login.sh
     - name: Run MCP client as Claude Code would
       run: |
         DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
@@ -1117,7 +1161,7 @@ jobs:
     name: WorkDesk e2e — смена канала на ходу (UDP закрыли после регистрации)
     needs:
     - build-for-linux
-    if: inputs.linux
+    if: inputs.linux && inputs.edition == 'ai'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -1171,6 +1215,16 @@ jobs:
         sudo grep -rih -E 'websocket|start tcp|start udp|ID server' /root/.local/share/logs 2>/dev/null | tail -20 || true
         grep -i -E 'websocket|start tcp|udp' host.log | tail -20 || true
         sleep 15
+    - name: WorkDesk AI без подписки — подключение запрещено
+      env:
+        PYTHONIOENCODING: utf-8
+        SMOKE_EXPECT: по подписке
+      run: python3 .github/mcp-e2e/smoke.py workdesk
+    - name: Вход в WorkDesk AI (служебная учетная запись CI с подпиской)
+      env:
+        WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
+        WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
+      run: bash .github/mcp-e2e/ci-login.sh
     - name: Run MCP client as Claude Code would
       run: |
         DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
@@ -1186,7 +1240,7 @@ jobs:
     name: WorkDesk для Claude Code (MCP) — проверка на Windows
     needs:
     - build-for-windows-flutter
-    if: inputs.windows
+    if: inputs.windows && inputs.edition == 'ai'
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
@@ -1203,6 +1257,7 @@ jobs:
       shell: bash
       env:
         PYTHONIOENCODING: utf-8
+        SMOKE_EXPECT: по подписке
       run: |
         ls wd | head -50
         EXE=$(ls wd/*.exe | grep -i -E '/(rustdesk|workdesk)\.exe$' | head -1)

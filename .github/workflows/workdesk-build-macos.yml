@@ -2,6 +2,15 @@
 name: WorkDesk — сборка macOS
 'on':
   workflow_dispatch:
+    inputs:
+      edition:
+        description: 'Продукт: workdesk — обычный WorkDesk (без Claude); ai — WorkDesk AI (Claude Code, по подписке)'
+        type: choice
+        options:
+        - workdesk
+        - ai
+        default: workdesk
+run-name: ${{ inputs.edition == 'ai' && 'WorkDesk AI' || 'WorkDesk' }} — сборка macOS (${{ github.ref_name }})
 env:
   SCITER_RUST_VERSION: '1.75'
   RUST_VERSION: '1.75'
@@ -69,6 +78,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: WorkDesk AI — включить связку с Claude Code
+        if: inputs.edition == 'ai'
+        run: python3 .github/workdesk-ai/enable.py
       - name: Install build runtime
         run: |
           brew install llvm create-dmg
@@ -191,9 +203,11 @@ jobs:
           fi
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
 
-      - name: WorkDesk для Claude Code (MCP) — проверка на macOS
+      - name: WorkDesk AI (MCP) — проверка на macOS
+        if: inputs.edition == 'ai'
         env:
           PYTHONIOENCODING: utf-8
+          SMOKE_EXPECT: по подписке
         run: |
           EXE=./flutter/build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/RustDesk
           ls -l "$EXE"

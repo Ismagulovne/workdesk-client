@@ -67,7 +67,8 @@ mod ui_cm_interface;
 mod ui_interface;
 mod ui_session_interface;
 
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
+// WorkDesk AI: режим --mcp для Claude Code — только в сборке WorkDesk AI (cargo-фича ai)
+#[cfg(all(feature = "ai", not(any(target_os = "android", target_os = "ios"))))]
 mod mcp;
 
 mod hbbs_http;

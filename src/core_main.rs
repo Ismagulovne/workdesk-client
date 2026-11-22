@@ -48,7 +48,10 @@ pub fn core_main() -> Option<CoreMainAction> {
     }
     crate::load_custom_client();
     if std::env::args().nth(1).as_deref() == Some("--mcp") {
+        #[cfg(feature = "ai")]
         crate::mcp::run();
+        #[cfg(not(feature = "ai"))]
+        eprintln!("Режим --mcp (Claude Code) есть только в WorkDesk AI — по подписке: https://workdesk.kz");
         return None;
     }
     #[cfg(windows)]

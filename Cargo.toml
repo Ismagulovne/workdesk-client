@@ -46,6 +46,8 @@ unix-file-copy-paste = [
     "clipboard/unix-file-copy-paste",
 ]
 screencapturekit = ["cpal/screencapturekit"]
+# WorkDesk AI: режим --mcp (Claude Code управляет удаленными устройствами), только по подписке. В обычном WorkDesk выключен.
+ai = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

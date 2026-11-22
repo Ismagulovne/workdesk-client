@@ -7,6 +7,7 @@ import '../../common.dart';
 import '../../common/widgets/chat_page.dart';
 import '../../models/platform_model.dart';
 import '../../models/state_model.dart';
+import '../../common/workdesk_edition.dart';
 import 'claude_page.dart';
 import 'connection_page.dart';
 
@@ -52,7 +53,8 @@ class HomePageState extends State<HomePage> {
       _pages.add(ConnectionPage(
         appBarActions: [],
       ));
-      if (isAndroid || isIOS) _pages.add(ClaudePage());
+      // Вкладка «Claude» — только в WorkDesk AI (отдельное приложение по подписке)
+      if ((isAndroid || isIOS) && kWorkdeskAi) _pages.add(ClaudePage());
     }
     if (isAndroid && !bind.isOutgoingOnly()) {
       _chatPageTabIndex = _pages.length;

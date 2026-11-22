@@ -59,13 +59,18 @@ const MAX_REPORTED_RELAYS: usize = 32;
 // dropped from the configuration stops being accepted.
 const REPORTED_RELAY_TTL: Duration = Duration::from_secs(600);
 
-// WorkDesk: when the ID server does not answer over UDP (UDP 21116 closed by the network), this
-// process switches to WebSocket over 443 (wss://<id server>/ws/id, relay over /ws/relay) and
-// tries UDP again later. The switch lives in this process's memory only.
+// WorkDesk: two channels to the ID server. UDP is the main one; a WebSocket stream over 443
+// (wss://<id server>/ws/id) is kept open next to it all the time as the second one, and the server
+// sends requests both ways. When UDP does not answer (UDP 21116 closed by the network), this
+// process also carries connections over WebSocket (relay over /ws/relay) until UDP answers again.
+// The switch lives in this process's memory only.
 static WS_FALLBACK_SINCE: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
 const UDP_FIRST_ANSWER_MS: u128 = 20_000;
 const UDP_SILENCE_MS: u128 = 45_000;
-const WS_FALLBACK_RETRY_UDP_MS: u128 = 30 * 60_000;
+// The same request may come over both channels: handle it once.
+static RECENT_REQUESTS: std::sync::Mutex<VecDeque<(Vec<u8>, Instant)>> =
+    std::sync::Mutex::new(VecDeque::new());
+const DUPLICATE_WINDOW: Duration = Duration::from_secs(5);
 // UDP attempts in a row that ended without a single answer from the ID server
 static UDP_FAILED_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
 static UDP_ANSWERED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -92,8 +97,39 @@ fn ws_fallback_active() -> bool {
     WS_FALLBACK_SINCE.lock().unwrap().is_some()
 }
 
-fn ws_fallback_expired() -> bool {
-    matches!(*WS_FALLBACK_SINCE.lock().unwrap(), Some(t) if t.elapsed().as_millis() > WS_FALLBACK_RETRY_UDP_MS)
+/// A request for this device that already came over the other channel a moment ago.
+fn is_duplicate_request(msg: &Option<rendezvous_message::Union>) -> bool {
+    let key: Vec<u8> = match msg {
+        Some(rendezvous_message::Union::PunchHole(ph)) => [&b"P"[..], &ph.socket_addr[..]].concat(),
+        Some(rendezvous_message::Union::FetchLocalAddr(f)) => [&b"F"[..], &f.socket_addr[..]].concat(),
+        Some(rendezvous_message::Union::RequestRelay(r)) => {
+            [&b"R"[..], &r.socket_addr[..], r.uuid.as_bytes()].concat()
+        }
+        _ => return false,
+    };
+    let now = Instant::now();
+    let mut recent = RECENT_REQUESTS.lock().unwrap();
+    recent.retain(|(_, at)| now.saturating_duration_since(*at) < DUPLICATE_WINDOW);
+    if recent.iter().any(|(k, _)| *k == key) {
+        return true;
+    }
+    recent.push_back((key, now));
+    if recent.len() > 64 {
+        recent.pop_front();
+    }
+    false
+}
+
+/// Address of the second channel: wss://<id server>/ws/id. None for an IP-only server.
+fn second_channel_url(host: &str) -> Option<String> {
+    let name = hbb_common::socket_client::split_host_port(host)
+        .map(|(h, _)| h)
+        .unwrap_or_else(|| host.to_owned());
+    if name.is_empty() || name.parse::<std::net::IpAddr>().is_ok() {
+        return None;
+    }
+    let scheme = if Config::get_option("api-server").starts_with("https") { "wss" } else { "ws" };
+    Some(format!("{scheme}://{name}/ws/id"))
 }
 
 fn remember_reported_relay(relay_server: &str, now: Instant) {
@@ -367,6 +403,10 @@ impl RendezvousMediator {
         tokio::spawn(async move {
             direct_server(server_cloned).await;
         });
+        let server_cloned = server.clone();
+        tokio::spawn(async move {
+            Self::second_channel_loop(server_cloned).await;
+        });
         #[cfg(target_os = "android")]
         let start_lan_listening = true;
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -499,6 +539,9 @@ impl RendezvousMediator {
                     match n {
                         Some(Ok((bytes, _))) => {
                             UDP_ANSWERED.store(true, Ordering::SeqCst);
+                            if ws_fallback_active() {
+                                set_ws_fallback(false);
+                            }
                             if let Ok(msg) = Message::parse_from_bytes(&bytes) {
                                 rz.handle_resp(msg.union, Sink::Framed(&mut socket, &addr), &server, &mut update_latency).await?;
                             } else {
@@ -579,6 +622,9 @@ impl RendezvousMediator {
         server: &ServerPtr,
         update_latency: &mut impl FnMut(),
     ) -> ResultType<()> {
+        if is_duplicate_request(&msg) {
+            return Ok(());
+        }
         match msg {
             Some(rendezvous_message::Union::RegisterPeerResponse(rpr)) => {
                 update_latency();
@@ -676,15 +722,7 @@ impl RendezvousMediator {
     pub async fn start_tcp(server: ServerPtr, host: String) -> ResultType<()> {
         let host = check_port(&host, RENDEZVOUS_PORT);
         log::info!("start tcp: {}", hbb_common::websocket::check_ws(&host));
-        let mut conn = match connect_tcp(host.clone(), CONNECT_TIMEOUT).await {
-            Ok(conn) => conn,
-            Err(err) => {
-                if ws_fallback_active() {
-                    set_ws_fallback(false);
-                }
-                return Err(err);
-            }
-        };
+        let mut conn = connect_tcp(host.clone(), CONNECT_TIMEOUT).await?;
         let key = crate::get_key(true).await;
         crate::secure_tcp(&mut conn, &key).await?;
         let mut rz = Self {
@@ -723,10 +761,6 @@ impl RendezvousMediator {
                     if SHOULD_EXIT.load(Ordering::SeqCst) {
                         break;
                     }
-                    if ws_fallback_expired() {
-                        set_ws_fallback(false);
-                        break;
-                    }
                     // https://www.emqx.com/en/blog/mqtt-keep-alive
                     if last_recv_msg.elapsed().as_millis() as u64 > rz.keep_alive as u64 * 3 / 2 {
                         bail!("Rendezvous connection is timeout");
@@ -743,12 +777,78 @@ impl RendezvousMediator {
         Ok(())
     }
 
+    /// Second channel: a WebSocket stream to the ID server kept open next to UDP all the time.
+    async fn second_channel_loop(server: ServerPtr) {
+        loop {
+            let skip = config::option2bool("stop-service", &Config::get_option("stop-service"))
+                || crate::platform::installing_service()
+                || Config::is_proxy()
+                || (use_ws() && !ws_fallback_active());
+            let host = Config::get_rendezvous_servers().into_iter().next().unwrap_or_default();
+            if !skip {
+                if let Some(url) = second_channel_url(&host) {
+                    if let Err(err) = Self::run_second_channel(server.clone(), host, url).await {
+                        log::debug!("second channel: {err}");
+                    }
+                }
+            }
+            sleep(5.).await;
+        }
+    }
+
+    async fn run_second_channel(server: ServerPtr, host: String, url: String) -> ResultType<()> {
+        let host = check_port(&host, RENDEZVOUS_PORT);
+        let mut conn = connect_tcp(url.as_str(), CONNECT_TIMEOUT).await?;
+        let mut rz = Self {
+            addr: conn.local_addr().into_target_addr()?,
+            host: host.clone(),
+            host_prefix: Self::get_host_prefix(&host),
+            keep_alive: crate::DEFAULT_KEEP_ALIVE,
+        };
+        // the server binds this stream to the device ID by its registration
+        rz.register_pk(Sink::Stream(&mut conn)).await?;
+        log::info!("second channel to the ID server: {url}");
+        let mut timer = crate::rustdesk_interval(interval(crate::TIMER_OUT));
+        let mut last_recv = Instant::now();
+        let mut last_register = Instant::now();
+        loop {
+            select! {
+                res = conn.next() => {
+                    last_recv = Instant::now();
+                    let bytes = res.ok_or_else(|| anyhow::anyhow!("second channel closed by the server"))??;
+                    if bytes.is_empty() {
+                        conn.send_bytes(bytes::Bytes::new()).await?;
+                        if ws_fallback_active() {
+                            // UDP is silent: this channel is what keeps the device online
+                            Config::update_latency(&host, 50_000);
+                        }
+                        continue;
+                    }
+                    let msg = Message::parse_from_bytes(&bytes)?;
+                    rz.handle_resp(msg.union, Sink::Stream(&mut conn), &server, &mut || {}).await?
+                }
+                _ = timer.tick() => {
+                    if last_recv.elapsed().as_millis() as u64 > rz.keep_alive as u64 * 3 / 2 {
+                        bail!("second channel timeout");
+                    }
+                    if (!Config::get_key_confirmed() || !Config::get_host_key_confirmed(&rz.host_prefix))
+                        && last_register.elapsed().as_millis() as i64 >= REG_INTERVAL {
+                        rz.register_pk(Sink::Stream(&mut conn)).await?;
+                        last_register = Instant::now();
+                    }
+                }
+            }
+        }
+    }
+
     pub async fn start(server: ServerPtr, host: String) -> ResultType<()> {
         log::info!("start rendezvous mediator of {}", host);
         //If the investment agent type is http or https, then tcp forwarding is enabled.
+        // WebSocket chosen in the settings (not the automatic switch): the old single-channel mode
+        let explicit_ws = use_ws() && !ws_fallback_active();
         if (cfg!(debug_assertions) && option_env!("TEST_TCP").is_some())
             || Config::is_proxy()
-            || use_ws()
+            || explicit_ws
             || crate::is_udp_disabled()
         {
             Self::start_tcp(server, host).await

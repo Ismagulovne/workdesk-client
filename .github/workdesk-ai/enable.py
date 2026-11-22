@@ -40,7 +40,27 @@ def main():
         t2 = re.sub(r'(<string name="app_name">)WorkDesk(</string>)', rf"\g<1>{APP}\g<2>", t)
         if t2 != t:
             strings.write_text(t2, encoding="utf-8", newline="\n")
-    print(f"{APP}: --mcp (cargo ai), вкладка Claude, Android {ANDROID_ID}")
+    linux_package()
+    print(f"{APP}: --mcp (cargo ai), вкладка Claude, Android {ANDROID_ID}, Linux-пакет {PKG}")
+
+
+PKG = "workdesk-ai"
+
+
+def linux_package():
+    """Linux: свой пакет workdesk-ai вместо workdesk. Файлы, служба и команда те же (/usr/share/workdesk,
+    workdesk.service, workdesk), поэтому WorkDesk AI ставится вместо WorkDesk, а обновления обычного пакета
+    workdesk из репозитория workdesk.kz/repo его не заменяют."""
+    bp = SRC / "build.py"
+    sub_once(bp, r'^    content = """Package: workdesk\n',
+             f'    content = """Package: {PKG}\nConflicts: workdesk\nReplaces: workdesk\nProvides: workdesk\n',
+             f'"""Package: {PKG}\n')
+    sub_once(bp, r"^Description: WorkDesk remote desktop", f"Description: {APP} remote desktop", f"Description: {APP} remote desktop")
+    sub_once(bp, r"os\.rename\('workdesk\.deb', '\.\./workdesk-%s\.deb' % version\)",
+             f"os.rename('workdesk.deb', '../{PKG}-%s.deb' % version)", f"'../{PKG}-%s.deb' % version)")
+    for spec in ("rpm-flutter.spec", "rpm-flutter-suse.spec"):
+        sub_once(SRC / "res" / spec, r"^Name:       workdesk\n",
+                 f"Name:       {PKG}\nConflicts:  workdesk\nObsoletes:  workdesk\nProvides:   workdesk\n", f"Name:       {PKG}\n")
 
 
 if __name__ == "__main__":

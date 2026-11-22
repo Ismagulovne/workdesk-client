@@ -1036,7 +1036,7 @@ jobs:
     - name: Install WorkDesk and virtual display
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y xvfb xterm ./pkg/workdesk-${{ env.VERSION }}-x86_64.deb
+        sudo apt-get install -y xvfb xterm ./pkg/workdesk*-${{ env.VERSION }}-x86_64.deb
         sudo systemctl stop workdesk || true
         sudo systemctl disable workdesk || true
         sudo pkill -f 'workdesk --' || true
@@ -1100,7 +1100,7 @@ jobs:
     - name: Install WorkDesk and virtual display
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y xvfb xterm ./pkg/workdesk-${{ env.VERSION }}-x86_64.deb
+        sudo apt-get install -y xvfb xterm ./pkg/workdesk*-${{ env.VERSION }}-x86_64.deb
         sudo systemctl stop workdesk || true
         sudo systemctl disable workdesk || true
         sudo pkill -f 'workdesk --' || true
@@ -1177,7 +1177,7 @@ jobs:
     - name: Install WorkDesk and virtual display
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y xvfb xterm ./pkg/workdesk-${{ env.VERSION }}-x86_64.deb
+        sudo apt-get install -y xvfb xterm ./pkg/workdesk*-${{ env.VERSION }}-x86_64.deb
         sudo systemctl stop workdesk || true
         sudo systemctl disable workdesk || true
         sudo pkill -f 'workdesk --' || true

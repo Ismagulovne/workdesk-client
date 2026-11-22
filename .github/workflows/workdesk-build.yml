@@ -11,6 +11,14 @@ name: WorkDesk — сборка Windows, Android и Linux
         description: Android (APK arm64 и armv7)
         type: boolean
         default: true
+      play:
+        description: Google Play — один AAB (arm64 + armv7), нужен Android
+        type: boolean
+        default: false
+      play_version_code:
+        description: versionCode для Google Play (больше прошлой загрузки)
+        type: string
+        default: ''
       linux:
         description: Linux (deb и rpm, x86_64 и arm64)
         type: boolean
@@ -534,6 +542,13 @@ jobs:
         popd
         mkdir -p signed-apk; pushd signed-apk
         mv ../${{ env.APP_NAME }}-${{ env.VERSION }}-${{ matrix.job.arch }}${{ matrix.job.suffix }}.apk .
+    - name: Native libraries for Google Play
+      if: inputs.play
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: android-jnilibs-${{ matrix.job.arch }}
+        path: ./flutter/android/app/src/main/jniLibs/
+        retention-days: 3
     - name: Setup sign tool version variable
       shell: bash
       run: |
@@ -571,6 +586,100 @@ jobs:
     if: inputs.android
     permissions:
       contents: write
+  play-aab:
+    name: WorkDesk Google Play (AAB)
+    needs:
+    - generate-bridge
+    - build-for-android
+    if: inputs.play && inputs.android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        submodules: recursive
+    - name: versionCode
+      run: |
+        test -n "${{ inputs.play_version_code }}" || { echo "Укажите play_version_code"; exit 1; }
+        echo "${{ inputs.play_version_code }}" | grep -qE '^[0-9]+$'
+    - name: Install flutter
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+      with:
+        channel: stable
+        flutter-version: ${{ env.ANDROID_FLUTTER_VERSION }}
+    - name: Patch flutter
+      run: |
+        cd $(dirname $(dirname $(which flutter)))
+        if [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]]; then
+          git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+        fi
+    - name: Restore bridge files
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: bridge-artifact
+        path: ./
+    - name: Native libraries arm64-v8a
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: android-jnilibs-aarch64
+        path: ./flutter/android/app/src/main/jniLibs/
+    - name: Native libraries armeabi-v7a
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: android-jnilibs-armv7
+        path: ./flutter/android/app/src/main/jniLibs/
+    - name: Upload key (the same key as the APK on the site)
+      if: env.ANDROID_SIGNING_KEY != ''
+      env:
+        KS_PASSWORD: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+        KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.ANDROID_ALIAS }}
+      run: |
+        printf '%s' "$ANDROID_SIGNING_KEY" | base64 -d > "$RUNNER_TEMP/upload.jks"
+        {
+          echo "storeFile=$RUNNER_TEMP/upload.jks"
+          echo "storePassword=$KS_PASSWORD"
+          echo "keyAlias=$KEY_ALIAS"
+          echo "keyPassword=$KEY_PASSWORD"
+        } > flutter/android/key.properties
+    - name: Build AAB
+      shell: bash
+      env:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      run: |
+        export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
+        sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
+        ls -R flutter/android/app/src/main/jniLibs
+        cd flutter
+        flutter pub get
+        flutter build appbundle --release --target-platform android-arm64,android-arm \
+          --build-number=${{ inputs.play_version_code }} --build-name=${{ env.VERSION }}
+        cp build/app/outputs/bundle/release/app-release.aab ../WorkDesk-${{ env.VERSION }}-play-${{ inputs.play_version_code }}.aab
+    - name: Check AAB (signature, ABI, permissions)
+      shell: bash
+      run: |
+        rm -f "$RUNNER_TEMP/upload.jks" flutter/android/key.properties
+        A=WorkDesk-${{ env.VERSION }}-play-${{ inputs.play_version_code }}.aab
+        ls -lh $A; sha256sum $A | tee $A.sha256
+        keytool -printcert -jarfile $A | grep -E 'Owner|SHA1|SHA256'
+        unzip -l $A | grep -E 'base/lib/.*/librustdesk.so'
+        curl -fsSL -o bundletool.jar https://github.com/google/bundletool/releases/download/1.17.2/bundletool-all-1.17.2.jar
+        java -jar bundletool.jar dump manifest --bundle $A > manifest.xml
+        grep -oE 'package="[^"]+"|android:versionCode="[^"]+"|android:versionName="[^"]+"|android:targetSdkVersion="[^"]+"|android:minSdkVersion="[^"]+"' manifest.xml
+        echo "Разрешения:"; grep -oE 'uses-permission[^>]*android:name="[^"]+"' manifest.xml | sed 's/.*android:name=//' | sort -u
+        echo "Службы:"; grep -oE '<service[^>]*android:name="[^"]+"' manifest.xml | sed 's/.*android:name=//' || true
+        grep -q 'package="kz.workdesk.app"' manifest.xml
+        ! grep -qE 'BIND_ACCESSIBILITY_SERVICE|MANAGE_EXTERNAL_STORAGE|QUERY_ALL_PACKAGES|REQUEST_INSTALL_PACKAGES|SYSTEM_ALERT_WINDOW' manifest.xml
+    - name: Upload AAB
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: WorkDesk-${{ env.VERSION }}-play-${{ inputs.play_version_code }}
+        path: |
+          WorkDesk-${{ env.VERSION }}-play-${{ inputs.play_version_code }}.aab
+          WorkDesk-${{ env.VERSION }}-play-${{ inputs.play_version_code }}.aab.sha256
+          manifest.xml
+        retention-days: 30
   build-for-linux:
     needs:
     - generate-bridge

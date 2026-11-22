@@ -47,10 +47,11 @@ jobs:
         sudo systemctl stop workdesk || true
         sudo systemctl disable workdesk || true
         sudo pkill -f 'workdesk --' || true
-        Xvfb :99 -screen 0 1280x800x24 -ac &
+        Xvfb :99 -screen 0 1080x1800x24 -ac &
         sleep 2
         DISPLAY=:99 xsetroot -solid '#4B2BE0'
-        DISPLAY=:99 xterm -geometry 90x24+150+150 -fa Monospace -fs 13 -bg white -fg '#1b1b1f' -T 'Демо-компьютер' -e bash -c 'echo "WorkDesk — демо-компьютер"; echo; uname -sr; echo; echo "Удалённый доступ к компьютерам компании"; sleep infinity' &
+        DISPLAY=:99 xterm -geometry 52x9+30+40 -fa Monospace -fs 17 -bg '#1e1b4b' -fg white -T 'WorkDesk' -e bash -c 'printf "\n  WorkDesk — демо-компьютер\n\n  %s\n  Удалённый доступ к компьютерам компании\n" "$(uname -sr)"; sleep infinity' &
+        DISPLAY=:99 xterm -geometry 74x46+30+420 -fa Monospace -fs 12 -bg white -fg '#1b1b1f' -T 'top' -e top -d 2 &
         sudo -b env DISPLAY=:99 HOME=/root workdesk --server > host.log 2>&1
         PASS="Demo-$(openssl rand -hex 4)"
         echo "::add-mask::$PASS"

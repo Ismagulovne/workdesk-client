@@ -14,9 +14,12 @@ TOKEN=$(curl -fsS -H 'Content-Type: application/json' --data-binary "$BODY" "$AP
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 echo "::add-mask::$TOKEN"
 # Папка настроек на Linux — ~/.config/<имя программы строчными> (directories-next), файл <Имя>_local.toml
+# Папку могла создать служба WorkDesk от root — пишем через sudo и отдаем текущему пользователю
+SUDO=""; command -v sudo >/dev/null && SUDO="sudo"
 for DIR in "$HOME/.config/${APP,,}" "$HOME/.config/$APP"; do
-  mkdir -p "$DIR"
-  printf '[options]\naccess_token = "%s"\n' "$TOKEN" > "$DIR/${APP}_local.toml"
+  $SUDO mkdir -p "$DIR"
+  printf '[options]\naccess_token = "%s"\n' "$TOKEN" | $SUDO tee "$DIR/${APP}_local.toml" >/dev/null
+  $SUDO chown -R "$(id -u):$(id -g)" "$DIR"
 done
 ls -la "$HOME/.config/${APP,,}" || true
 STATUS=$(curl -fsS -H "Authorization: Bearer $TOKEN" "$API/api/workdesk-ai/status")

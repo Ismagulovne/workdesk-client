@@ -29,6 +29,12 @@ def sub_once(path: Path, pattern: str, repl: str, done: str):
 
 
 def main():
+    # Консоль Windows в CI — cp1252: без этого print с русским текстом падает
+    for s in (sys.stdout, sys.stderr):
+        try:
+            s.reconfigure(encoding="utf-8")
+        except AttributeError:
+            pass
     sub_once(SRC / "Cargo.toml", r'^default = \["use_dasp"\]$', 'default = ["use_dasp", "ai"]', 'default = ["use_dasp", "ai"]')
     sub_once(SRC / "flutter/lib/common/workdesk_edition.dart", r"^const bool kWorkdeskAi = false;$",
              "const bool kWorkdeskAi = true;", "const bool kWorkdeskAi = true;")

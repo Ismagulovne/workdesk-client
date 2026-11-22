@@ -252,7 +252,7 @@ const AI_RECHECK: Duration = Duration::from_secs(600);
 fn check_ai_subscription() -> Result<(), String> {
     let token = LocalConfig::get_option("access_token");
     if token.is_empty() {
-        return Err("WorkDesk AI работает по подписке. Войдите в учетную запись WorkDesk в этой программе                     (Настройки → Учетная запись) и повторите."
+        return Err("WorkDesk AI работает по подписке. Войдите в учетную запись WorkDesk в этой программе (Настройки → Учетная запись) и повторите."
             .to_owned());
     }
     let api = crate::ui_interface::get_api_server();

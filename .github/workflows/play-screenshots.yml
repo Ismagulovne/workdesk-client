@@ -16,6 +16,10 @@ on:
         required: false
         default: ru-RU
         type: string
+      crash:
+        description: После скриншотов прогнать краш-тест (crash.sh) на Android 7.0, 11 и 14
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,8 +27,12 @@ permissions:
 
 jobs:
   shots:
-    name: Скриншоты на эмуляторе Android
+    name: Эмулятор Android ${{ matrix.api }}
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        api: ${{ fromJSON(inputs.crash && '[24, 30, 34]' || '[30]') }}
     timeout-minutes: 45
     steps:
     - name: Checkout
@@ -78,16 +86,16 @@ jobs:
     - name: Эмулятор и скриншоты
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 30
+        api-level: ${{ matrix.api }}
         target: google_apis
         arch: x86_64
         profile: pixel_6
         disable-animations: true
-        script: LOCALE=${{ inputs.locale }} bash .github/play-screens/shoot.sh
+        script: LOCALE=${{ inputs.locale }} bash .github/play-screens/shoot.sh; if [ "${{ inputs.crash }}" = "true" ]; then bash .github/play-screens/crash.sh; fi
     - name: Скриншоты
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
-        name: play-screenshots
+        name: play-screenshots-api${{ matrix.api }}
         path: shots
         retention-days: 14

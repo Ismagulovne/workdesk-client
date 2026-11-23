@@ -1074,6 +1074,14 @@ jobs:
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
         echo "XDG_CONFIG_HOME было: ${XDG_CONFIG_HOME:-не задано}"
         HOME="$RUNNER_TEMP/mcp-home" XDG_CONFIG_HOME="$RUNNER_TEMP/mcp-home/.config" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+    - name: Журналы WorkDesk (клиент и хост)
+      if: always()
+      run: |
+        mkdir -p mcp-out/logs
+        sudo find /root /home/runner "$RUNNER_TEMP/mcp-home" -path '*/logs/*' -name '*.log' 2>/dev/null | while read -r f; do
+          d="mcp-out/logs/$(echo "$f" | tr '/' '_')"; sudo cp "$f" "$d"; done
+        sudo chown -R "$(id -u)" mcp-out/logs
+        ls -la mcp-out/logs | head -30
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -1158,6 +1166,14 @@ jobs:
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
         echo "XDG_CONFIG_HOME было: ${XDG_CONFIG_HOME:-не задано}"
         HOME="$RUNNER_TEMP/mcp-home" XDG_CONFIG_HOME="$RUNNER_TEMP/mcp-home/.config" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+    - name: Журналы WorkDesk (клиент и хост)
+      if: always()
+      run: |
+        mkdir -p mcp-out/logs
+        sudo find /root /home/runner "$RUNNER_TEMP/mcp-home" -path '*/logs/*' -name '*.log' 2>/dev/null | while read -r f; do
+          d="mcp-out/logs/$(echo "$f" | tr '/' '_')"; sudo cp "$f" "$d"; done
+        sudo chown -R "$(id -u)" mcp-out/logs
+        ls -la mcp-out/logs | head -30
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -1244,6 +1260,14 @@ jobs:
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
         echo "XDG_CONFIG_HOME было: ${XDG_CONFIG_HOME:-не задано}"
         HOME="$RUNNER_TEMP/mcp-home" XDG_CONFIG_HOME="$RUNNER_TEMP/mcp-home/.config" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+    - name: Журналы WorkDesk (клиент и хост)
+      if: always()
+      run: |
+        mkdir -p mcp-out/logs
+        sudo find /root /home/runner "$RUNNER_TEMP/mcp-home" -path '*/logs/*' -name '*.log' 2>/dev/null | while read -r f; do
+          d="mcp-out/logs/$(echo "$f" | tr '/' '_')"; sudo cp "$f" "$d"; done
+        sudo chown -R "$(id -u)" mcp-out/logs
+        ls -la mcp-out/logs | head -30
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

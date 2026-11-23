@@ -660,6 +660,9 @@ jobs:
       run: |
         export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
         sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
+        # Google Play: автоматическая защита требует minSdk 24 (Android 7.0); APK на сайте остаются с minSdk 22
+        sed -i "s/minSdkVersion 22/minSdkVersion 24/" flutter/android/app/build.gradle
+        grep -n minSdkVersion flutter/android/app/build.gradle
         ls -R flutter/android/app/src/main/jniLibs
         cd flutter
         flutter pub get

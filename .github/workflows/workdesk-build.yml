@@ -1056,6 +1056,14 @@ jobs:
           sleep 2
         done
         test -n "$ID"
+        # Служба при первом запуске может сменить ID («ID is invalid, generating new one») —
+        # ждем, пока --get-id дважды подряд не вернет одно и то же
+        for i in $(seq 1 20); do
+          sleep 3
+          ID2=$(sudo env HOME=/root workdesk --get-id 2>/dev/null | tr -dc '0-9')
+          if [ -n "$ID2" ] && [ "$ID2" = "$ID" ]; then break; fi
+          [ -n "$ID2" ] && ID="$ID2"
+        done
         sudo env HOME=/root workdesk --password "$PASS"
         echo "PEER_ID=$ID" >> "$GITHUB_ENV"
         echo "Хост готов, ID $ID"
@@ -1137,6 +1145,14 @@ jobs:
           sleep 2
         done
         test -n "$ID"
+        # Служба при первом запуске может сменить ID («ID is invalid, generating new one») —
+        # ждем, пока --get-id дважды подряд не вернет одно и то же
+        for i in $(seq 1 20); do
+          sleep 3
+          ID2=$(sudo env HOME=/root workdesk --get-id 2>/dev/null | tr -dc '0-9')
+          if [ -n "$ID2" ] && [ "$ID2" = "$ID" ]; then break; fi
+          [ -n "$ID2" ] && ID="$ID2"
+        done
         sudo env HOME=/root workdesk --password "$PASS"
         echo "PEER_ID=$ID" >> "$GITHUB_ENV"
         echo "Хост готов, ID $ID"
@@ -1222,6 +1238,14 @@ jobs:
           sleep 2
         done
         test -n "$ID"
+        # Служба при первом запуске может сменить ID («ID is invalid, generating new one») —
+        # ждем, пока --get-id дважды подряд не вернет одно и то же
+        for i in $(seq 1 20); do
+          sleep 3
+          ID2=$(sudo env HOME=/root workdesk --get-id 2>/dev/null | tr -dc '0-9')
+          if [ -n "$ID2" ] && [ "$ID2" = "$ID" ]; then break; fi
+          [ -n "$ID2" ] && ID="$ID2"
+        done
         sudo env HOME=/root workdesk --password "$PASS"
         echo "PEER_ID=$ID" >> "$GITHUB_ENV"
         echo "Хост готов, ID $ID"

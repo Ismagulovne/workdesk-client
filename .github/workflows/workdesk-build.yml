@@ -1073,7 +1073,8 @@ jobs:
     - name: Run MCP client as Claude Code would
       run: |
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
-        HOME="$RUNNER_TEMP/mcp-home" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+        echo "XDG_CONFIG_HOME было: ${XDG_CONFIG_HOME:-не задано}"
+        HOME="$RUNNER_TEMP/mcp-home" XDG_CONFIG_HOME="$RUNNER_TEMP/mcp-home/.config" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -1152,7 +1153,8 @@ jobs:
     - name: Run MCP client as Claude Code would
       run: |
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
-        HOME="$RUNNER_TEMP/mcp-home" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+        echo "XDG_CONFIG_HOME было: ${XDG_CONFIG_HOME:-не задано}"
+        HOME="$RUNNER_TEMP/mcp-home" XDG_CONFIG_HOME="$RUNNER_TEMP/mcp-home/.config" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -1233,7 +1235,8 @@ jobs:
     - name: Run MCP client as Claude Code would
       run: |
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
-        HOME="$RUNNER_TEMP/mcp-home" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+        echo "XDG_CONFIG_HOME было: ${XDG_CONFIG_HOME:-не задано}"
+        HOME="$RUNNER_TEMP/mcp-home" XDG_CONFIG_HOME="$RUNNER_TEMP/mcp-home/.config" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
     - name: Upload e2e results
       if: always()
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

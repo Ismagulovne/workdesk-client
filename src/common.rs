@@ -2301,14 +2301,22 @@ async fn secure_tcp_impl(conn: &mut Stream, key: &str, log_on_success: bool) -> 
 }
 
 /// The server's key exchange on `conn`. `Ok(true)` once the stream is encrypted. `Ok(false)`
-/// when the server sent something else first, nothing parseable, or closed: `secure_tcp`
-/// tolerates that for servers from before the exchange, `secure_tcp_required` does not.
+/// when the server sent something else first, nothing parseable, closed, or stayed silent for
+/// `KEY_EXCHANGE_WAIT_MS`: `secure_tcp` tolerates that for servers from before the exchange
+/// (the open-source hbbs never starts one), `secure_tcp_required` does not.
 async fn key_exchange(conn: &mut Stream, key: &str, log_on_success: bool) -> ResultType<bool> {
     let rs_pk = get_rs_pk(key);
     let Some(rs_pk) = rs_pk else {
         bail!("Handshake failed: invalid public key from rendezvous server");
     };
-    match timeout(READ_TIMEOUT, conn.next()).await? {
+    // WorkDesk: a server that says nothing is a server without the exchange. Before, the timeout
+    // was an error, so a client signed in to the console (it has a token) never connected over
+    // TCP to such a server. Nothing was read, so the stream can go on in the clear.
+    let Ok(first) = timeout(KEY_EXCHANGE_WAIT_MS, conn.next()).await else {
+        log::warn!("The rendezvous server did not start a key exchange, going on without one");
+        return Ok(false);
+    };
+    match first {
         Some(Ok(bytes)) => {
             if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(&bytes) {
                 match msg_in.union {
@@ -2371,6 +2379,10 @@ async fn key_exchange(conn: &mut Stream, key: &str, log_on_success: bool) -> Res
     }
     Ok(false)
 }
+
+/// How long to wait for the server to start the key exchange. Servers that support it send
+/// it at once (WorkDesk hbbs within a second of a silent connection).
+const KEY_EXCHANGE_WAIT_MS: u64 = 5_000;
 
 pub async fn secure_tcp(conn: &mut Stream, key: &str) -> ResultType<()> {
     secure_tcp_impl(conn, key, true).await

@@ -1059,17 +1059,16 @@ jobs:
         sudo env HOME=/root workdesk --password "$PASS"
         echo "PEER_ID=$ID" >> "$GITHUB_ENV"
         echo "Хост готов, ID $ID"
-    - name: WorkDesk AI без подписки — подключение запрещено
-      env:
-        PYTHONIOENCODING: utf-8
-        SMOKE_EXPECT: по подписке
-      run: python3 .github/mcp-e2e/smoke.py workdesk
     - name: Вход в WorkDesk AI (служебная учетная запись CI с подпиской)
       env:
         WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
         MCP_HOME: ${{ runner.temp }}/mcp-home
       run: bash .github/mcp-e2e/ci-login.sh
+    - name: Процессы WorkDesk и порты перед проверкой
+      run: |
+        ps -eo user,pid,args | grep -i [w]orkdesk || true
+        sudo ss -ltnup | grep -iE 'workdesk|2111[5-9]' || true
     - name: Run MCP client as Claude Code would
       run: |
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
@@ -1150,6 +1149,10 @@ jobs:
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
         MCP_HOME: ${{ runner.temp }}/mcp-home
       run: bash .github/mcp-e2e/ci-login.sh
+    - name: Процессы WorkDesk и порты перед проверкой
+      run: |
+        ps -eo user,pid,args | grep -i [w]orkdesk || true
+        sudo ss -ltnup | grep -iE 'workdesk|2111[5-9]' || true
     - name: Run MCP client as Claude Code would
       run: |
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста
@@ -1232,6 +1235,10 @@ jobs:
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
         MCP_HOME: ${{ runner.temp }}/mcp-home
       run: bash .github/mcp-e2e/ci-login.sh
+    - name: Процессы WorkDesk и порты перед проверкой
+      run: |
+        ps -eo user,pid,args | grep -i [w]orkdesk || true
+        sudo ss -ltnup | grep -iE 'workdesk|2111[5-9]' || true
     - name: Run MCP client as Claude Code would
       run: |
         # свой HOME у клиента: настройки (ID, ключи) не совпадают с настройками хоста

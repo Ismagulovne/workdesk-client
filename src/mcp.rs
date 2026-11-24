@@ -1,4 +1,4 @@
-// WorkDesk AI: `WorkDesk --mcp` — MCP-сервер для Claude Code (JSON-RPC по stdio). Только по подписке WorkDesk AI.
+// WorkDesk AI: `WorkDesk --mcp` — MCP-сервер для Claude Code (JSON-RPC по stdio). Доступен после входа в учетную запись WorkDesk.
 // Это еще один «интерфейс» сеанса рядом с Flutter и Sciter: подключение идет по обычному протоколу,
 // удаленная сторона видит обычное входящее подключение и может его разорвать.
 use crate::{
@@ -241,24 +241,24 @@ fn wait_connected(h: &McpHandler, timeout: Duration) -> Result<(), String> {
 
 pub struct Server {
     conns: HashMap<String, Conn>,
-    /// Когда сервер WorkDesk последний раз подтвердил подписку WorkDesk AI (проверка не чаще раза в 10 минут)
+    /// Когда сервер WorkDesk последний раз подтвердил доступ к WorkDesk AI (проверка не чаще раза в 10 минут)
     ai_checked: Option<Instant>,
 }
 
 const AI_RECHECK: Duration = Duration::from_secs(600);
 
-/// Подписка WorkDesk AI: программа должна быть войдена в учетную запись WorkDesk компании с активной подпиской.
+/// Доступ к WorkDesk AI: программа должна быть войдена в учетную запись WorkDesk (компания не заблокирована).
 /// Сервер WorkDesk отвечает на GET <api-server>/api/workdesk-ai/status { active, until, reason }.
 fn check_ai_subscription() -> Result<(), String> {
     let token = LocalConfig::get_option("access_token");
     if token.is_empty() {
-        return Err("WorkDesk AI работает по подписке. Войдите в учетную запись WorkDesk в этой программе (Настройки → Учетная запись) и повторите."
+        return Err("WorkDesk AI работает после входа. Войдите в учетную запись WorkDesk в этой программе (Настройки → Учетная запись) и повторите."
             .to_owned());
     }
     let api = crate::ui_interface::get_api_server();
     let api = api.trim_end_matches('/').to_owned();
     if api.is_empty() {
-        return Err("Не задан сервер WorkDesk: подписку WorkDesk AI проверить нельзя.".to_owned());
+        return Err("Не задан сервер WorkDesk: доступ к WorkDesk AI проверить нельзя.".to_owned());
     }
     let url = format!("{}/api/workdesk-ai/status", api);
     // Синхронный HTTP-клиент — в отдельном потоке: здесь не должно быть контекста tokio
@@ -274,19 +274,19 @@ fn check_ai_subscription() -> Result<(), String> {
         Ok((code, r.text().unwrap_or_default()))
     })
     .join()
-    .map_err(|_| "сбой проверки подписки WorkDesk AI".to_owned())?;
+    .map_err(|_| "сбой проверки доступа к WorkDesk AI".to_owned())?;
     match res {
-        Err(e) => Err(format!("Не удалось проверить подписку WorkDesk AI на сервере {}: {}", api, e)),
+        Err(e) => Err(format!("Не удалось проверить доступ к WorkDesk AI на сервере {}: {}", api, e)),
         Ok((401, _)) => Err("Сеанс WorkDesk истек. Войдите в учетную запись WorkDesk заново и повторите.".to_owned()),
         Ok((200, body)) => {
             let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
             if v["active"].as_bool() == Some(true) {
                 Ok(())
             } else {
-                Err(v["reason"].as_str().unwrap_or("Подписка WorkDesk AI не активна.").to_owned())
+                Err(v["reason"].as_str().unwrap_or("Доступ к WorkDesk AI закрыт. Обратитесь к администратору WorkDesk.").to_owned())
             }
         }
-        Ok((code, _)) => Err(format!("Сервер WorkDesk ответил {} на проверку подписки WorkDesk AI.", code)),
+        Ok((code, _)) => Err(format!("Сервер WorkDesk ответил {} на проверку доступа к WorkDesk AI.", code)),
     }
 }
 

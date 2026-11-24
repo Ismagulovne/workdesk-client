@@ -2,7 +2,7 @@
 
 python3 .github/workdesk-ai/enable.py
 
-- cargo-фича ai по умолчанию: режим --mcp на компьютере (проверяет подписку WorkDesk AI на сервере);
+- cargo-фича ai по умолчанию: режим --mcp на компьютере (проверяет на сервере, что пользователь вошел);
 - kWorkdeskAi = true во Flutter: вкладка «Claude» на телефоне, проверка обновлений из файлов WorkDesk AI;
 - Android: отдельное приложение kz.workdesk.ai с названием «WorkDesk AI» (ставится рядом с обычным WorkDesk).
 

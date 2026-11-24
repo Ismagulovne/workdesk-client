@@ -30,7 +30,7 @@ Future<void> workdeskCheckUpdate(BuildContext context) async {
   String? page;
   try {
     if (api.isEmpty) throw Exception('не задан сервер');
-    // WorkDesk AI проверяет свои сборки (сервер отдает их только при подписке, по токену учетной записи)
+    // WorkDesk AI проверяет свои сборки (сервер отдает их только вошедшим, по токену учетной записи)
     final edition = kWorkdeskAi ? '&edition=ai' : '';
     final r = await http
         .get(Uri.parse('$api/api/workdesk/update?platform=${_workdeskPlatform()}$edition'),
@@ -43,7 +43,7 @@ Future<void> workdeskCheckUpdate(BuildContext context) async {
     if (d['url'] == null || latest.isEmpty) {
       title = kWorkdeskAi ? 'Обновление WorkDesk AI' : 'Обновление WorkDesk';
       text = kWorkdeskAi
-          ? 'Сборок WorkDesk AI для этой системы нет, или не активна подписка: войдите в учетную запись WorkDesk.'
+          ? 'Сборок WorkDesk AI для этой системы нет, или вы не вошли: войдите в учетную запись WorkDesk.'
           : 'Для этой системы на сервере пока нет файла обновления.';
     } else if (latest.compareTo(buildDate) > 0) {
       title = 'Доступно обновление';

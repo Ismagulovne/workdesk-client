@@ -42,7 +42,7 @@ text = res["content"][0]["text"]
 print("connect к несуществующему ID:", text)
 assert res.get("isError"), "подключение к несуществующему ID должно вернуть ошибку"
 expect = os.environ.get("SMOKE_EXPECT", "")
-if expect:  # WorkDesk AI без входа: отказ по подписке, до попытки подключения
+if expect:  # WorkDesk AI без входа: отказ без входа, до попытки подключения
     assert expect in text, f"ожидалось «{expect}» в ответе: {text}"
 proc.stdin.close()
 proc.wait(timeout=30)

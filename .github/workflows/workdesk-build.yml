@@ -5,7 +5,7 @@ run-name: ${{ inputs.edition == 'ai' && 'WorkDesk AI' || 'WorkDesk' }} — сб�
   workflow_dispatch:
     inputs:
       edition:
-        description: 'Продукт: workdesk — обычный WorkDesk (без Claude); ai — WorkDesk AI (Claude Code, по подписке)'
+        description: 'Продукт: workdesk — обычный WorkDesk (без Claude); ai — WorkDesk AI (Claude Code, для вошедших)'
         type: choice
         options:
         - workdesk
@@ -1070,7 +1070,7 @@ jobs:
         sudo env HOME=/root workdesk --password "$PASS"
         echo "PEER_ID=$ID" >> "$GITHUB_ENV"
         echo "Хост готов, ID $ID"
-    - name: Вход в WorkDesk AI (служебная учетная запись CI с подпиской)
+    - name: Вход в WorkDesk AI (служебная учетная запись CI)
       env:
         WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
@@ -1226,12 +1226,12 @@ jobs:
         sudo grep -rih -E 'websocket|start tcp|start udp|ID server' /root/.local/share/logs 2>/dev/null | tail -20 || true
         grep -i -E 'websocket|start tcp|udp' host.log | tail -20 || true
         sleep 15
-    - name: WorkDesk AI без подписки — подключение запрещено
+    - name: WorkDesk AI без входа — подключение запрещено
       env:
         PYTHONIOENCODING: utf-8
-        SMOKE_EXPECT: по подписке
+        SMOKE_EXPECT: после входа
       run: python3 .github/mcp-e2e/smoke.py workdesk
-    - name: Вход в WorkDesk AI (служебная учетная запись CI с подпиской)
+    - name: Вход в WorkDesk AI (служебная учетная запись CI)
       env:
         WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
@@ -1328,12 +1328,12 @@ jobs:
         sudo grep -rih -E 'websocket|start tcp|start udp|ID server' /root/.local/share/logs 2>/dev/null | tail -20 || true
         grep -i -E 'websocket|start tcp|udp' host.log | tail -20 || true
         sleep 15
-    - name: WorkDesk AI без подписки — подключение запрещено
+    - name: WorkDesk AI без входа — подключение запрещено
       env:
         PYTHONIOENCODING: utf-8
-        SMOKE_EXPECT: по подписке
+        SMOKE_EXPECT: после входа
       run: python3 .github/mcp-e2e/smoke.py workdesk
-    - name: Вход в WorkDesk AI (служебная учетная запись CI с подпиской)
+    - name: Вход в WorkDesk AI (служебная учетная запись CI)
       env:
         WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
         WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
@@ -1385,7 +1385,7 @@ jobs:
       shell: bash
       env:
         PYTHONIOENCODING: utf-8
-        SMOKE_EXPECT: по подписке
+        SMOKE_EXPECT: после входа
       run: |
         ls wd | head -50
         EXE=$(ls wd/*.exe | grep -i -E '/(rustdesk|workdesk)\.exe$' | head -1)

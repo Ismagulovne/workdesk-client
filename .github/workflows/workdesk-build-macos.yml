@@ -4,7 +4,7 @@ name: WorkDesk — сборка macOS
   workflow_dispatch:
     inputs:
       edition:
-        description: 'Продукт: workdesk — обычный WorkDesk (без Claude); ai — WorkDesk AI (Claude Code, по подписке)'
+        description: 'Продукт: workdesk — обычный WorkDesk (без Claude); ai — WorkDesk AI (Claude Code, для вошедших)'
         type: choice
         options:
         - workdesk
@@ -207,7 +207,7 @@ jobs:
         if: inputs.edition == 'ai'
         env:
           PYTHONIOENCODING: utf-8
-          SMOKE_EXPECT: по подписке
+          SMOKE_EXPECT: после входа
         run: |
           EXE=./flutter/build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/RustDesk
           ls -l "$EXE"

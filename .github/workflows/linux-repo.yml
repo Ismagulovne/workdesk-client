@@ -1,0 +1,126 @@
+name: Репозиторий Linux (apt, dnf, zypper)
+
+# Собирает подписанные репозитории из пакетов, выложенных на workdesk.kz/download,
+# и проверяет установку из них на чистых системах. Результат (артефакт workdesk-repo) выкладывается
+# в /opt/workdesk/repo на сервере. С live=true проверяет уже выложенный https://workdesk.kz/repo.
+on:
+  workflow_dispatch:
+    inputs:
+      live:
+        description: Проверить установку с https://workdesk.kz/repo (а не собрать заново)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  KEY_FPR: BE9982B6842CD612148B54AA0DDC8DF694C15AB9
+
+jobs:
+  build:
+    if: ${{ !inputs.live }}
+    name: Сборка и подпись репозиториев
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        sparse-checkout: .github/linux-repo
+    - name: Инструменты
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y apt-utils createrepo-c rpm gnupg
+    - name: Ключ подписи
+      env:
+        KEY: ${{ secrets.REPO_GPG_PRIVATE_KEY }}
+      run: |
+        echo "$KEY" | gpg --batch --import
+        gpg --list-secret-keys --with-colons | grep -q "$KEY_FPR"
+    - name: Пакеты с workdesk.kz
+      run: |
+        mkdir -p in && cd in
+        curl -fsSL -A 'WorkDesk-CI-bot' https://workdesk.kz/download -o page.html
+        grep -oE '/download/workdesk-[0-9][^"]*\.(deb|rpm)' page.html | sort -u | tee list.txt
+        test -s list.txt
+        while read -r p; do curl -fsSLO "https://workdesk.kz$p"; done < list.txt
+        sha256sum *.deb *.rpm
+        for f in *.deb; do dpkg-deb -f "$f" Package Version Architecture; done
+        for f in *.rpm; do rpm -qp --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' "$f"; done
+    - name: Репозиторий deb (Ubuntu, Debian, Astra)
+      run: |
+        mkdir -p repo/deb && cp in/*.deb repo/deb/
+        cd repo/deb
+        apt-ftparchive packages . > Packages
+        gzip -9k Packages
+        apt-ftparchive -o APT::FTPArchive::Release::Origin=WorkDesk -o APT::FTPArchive::Release::Label=WorkDesk \
+          -o APT::FTPArchive::Release::Suite=stable -o APT::FTPArchive::Release::Codename=stable release . > Release
+        gpg --batch --yes -u "$KEY_FPR" --clearsign -o InRelease Release
+        gpg --batch --yes -u "$KEY_FPR" -abs -o Release.gpg Release
+    - name: Репозитории rpm (Fedora/RHEL/РЕД ОС/ALT и openSUSE)
+      run: |
+        cat > ~/.rpmmacros <<EOF
+        %_signature gpg
+        %_gpg_name $KEY_FPR
+        EOF
+        mkdir -p repo/rpm repo/suse
+        for f in in/*.rpm; do
+          case "$f" in *-suse.rpm) cp "$f" repo/suse/ ;; *) cp "$f" repo/rpm/ ;; esac
+        done
+        for d in rpm suse; do
+          rpmsign --addsign repo/$d/*.rpm
+          createrepo_c repo/$d
+          gpg --batch --yes -u "$KEY_FPR" --detach-sign --armor repo/$d/repodata/repomd.xml
+        done
+    - name: Ключ, скрипт установки и описание
+      run: |
+        gpg --armor --export "$KEY_FPR" > repo/workdesk.asc
+        cp .github/linux-repo/install.sh repo/install.sh
+        cat > repo/workdesk.repo <<EOF
+        [workdesk]
+        name=WorkDesk
+        baseurl=https://workdesk.kz/repo/rpm
+        enabled=1
+        gpgcheck=1
+        repo_gpgcheck=1
+        gpgkey=https://workdesk.kz/repo/workdesk.asc
+        EOF
+        find repo -type f | sort
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: workdesk-repo
+        path: repo
+        retention-days: 30
+
+  test:
+    name: Установка — ${{ matrix.image }}
+    needs: build
+    if: ${{ always() && (needs.build.result == 'success' || inputs.live) }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:24.04', 'ubuntu:22.04', 'debian:12', 'fedora:41', 'rockylinux:9', 'opensuse/leap:15.6']
+    container: ${{ matrix.image }}
+    steps:
+    - name: curl
+      run: |
+        if command -v apt-get; then apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null;
+        elif command -v zypper; then zypper --non-interactive install -y curl gzip systemd desktop-file-utils >/dev/null;  # как на обычной системе: скрипты пакета вызывают systemctl
+        else (dnf install -y curl-minimal || dnf install -y curl) >/dev/null 2>&1 || true; fi
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      if: ${{ !inputs.live }}
+      with:
+        name: workdesk-repo
+        path: /srv/repo
+    - name: Установка скриптом install.sh
+      run: |
+        if [ "${{ inputs.live }}" = "true" ]; then
+          curl -fsSL https://workdesk.kz/repo/install.sh | sh
+        else
+          WORKDESK_REPO=file:///srv/repo sh /srv/repo/install.sh
+        fi
+    - name: Проверка
+      run: |
+        (dpkg -s workdesk 2>/dev/null || rpm -qi workdesk) | head -5
+        test -x /usr/bin/workdesk || ls -la /usr/share/workdesk* /usr/lib/workdesk* 2>/dev/null
+        if command -v rpm >/dev/null && rpm -q workdesk >/dev/null 2>&1; then rpm -q --qf '%{SIGPGP:pgpsig}\n' workdesk; fi

@@ -680,6 +680,9 @@ jobs:
       run: |
         export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
         sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
+        # Google Play: автоматическая защита требует minSdk 24 (Android 7.0); APK на сайте остаются с minSdk 22
+        sed -i "s/minSdkVersion 22/minSdkVersion 24/" flutter/android/app/build.gradle
+        grep -n minSdkVersion flutter/android/app/build.gradle
         ls -R flutter/android/app/src/main/jniLibs
         cd flutter
         flutter pub get
@@ -1095,6 +1098,67 @@ jobs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: workdesk-mcp-e2e
+        path: |
+          mcp-out
+          host.log
+  mcp-e2e-login:
+    name: WorkDesk e2e — клиент вошёл в учётную запись (обмен ключами с сервером ID по TCP)
+    needs:
+    - build-for-linux
+    if: inputs.linux && inputs.edition == 'ai'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      with:
+        sparse-checkout: .github/mcp-e2e
+    - name: Download Linux package
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: WorkDesk-${{ env.VERSION }}-linux-x86_64
+        path: pkg
+    - name: Install WorkDesk and virtual display
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y xvfb xterm ./pkg/workdesk-${{ env.VERSION }}-x86_64.deb
+        sudo systemctl stop workdesk || true
+        sudo systemctl disable workdesk || true
+        sudo pkill -f 'workdesk --' || true
+        command -v workdesk
+    - name: Start remote host (root, Xvfb)
+      run: |
+        Xvfb :99 -screen 0 1280x800x24 -ac &
+        sleep 2
+        DISPLAY=:99 xterm -geometry 100x30+10+10 -e bash -c 'echo WorkDesk e2e host; cat > /tmp/typed.txt' &
+        sudo -b env DISPLAY=:99 HOME=/root workdesk --server > host.log 2>&1
+        PASS="E2e-$(openssl rand -hex 6)"
+        echo "::add-mask::$PASS"
+        echo "PASS=$PASS" >> "$GITHUB_ENV"
+        for i in $(seq 1 60); do
+          ID=$(sudo env HOME=/root workdesk --get-id 2>/dev/null | tr -dc '0-9')
+          [ -n "$ID" ] && break
+          sleep 2
+        done
+        test -n "$ID"
+        sudo env HOME=/root workdesk --password "$PASS"
+        echo "PEER_ID=$ID" >> "$GITHUB_ENV"
+        echo "Хост готов, ID $ID"
+    - name: Вход клиента в учетную запись WorkDesk (служебная CI)
+      env:
+        WORKDESK_CI_USER: ${{ secrets.WORKDESK_CI_USER }}
+        WORKDESK_CI_PASSWORD: ${{ secrets.WORKDESK_CI_PASSWORD }}
+        MCP_HOME: ${{ runner.temp }}/mcp-home
+      run: bash .github/mcp-e2e/ci-login.sh
+    - name: Run MCP client as Claude Code would
+      run: |
+        mkdir -p "$RUNNER_TEMP/mcp-home/.config"
+        HOME="$RUNNER_TEMP/mcp-home" XDG_CONFIG_HOME="$RUNNER_TEMP/mcp-home/.config" DISPLAY=:99 python3 .github/mcp-e2e/driver.py workdesk "$PEER_ID" "$PASS" mcp-out
+    - name: Upload e2e results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: workdesk-mcp-e2e-login
         path: |
           mcp-out
           host.log

@@ -1,0 +1,205 @@
+name: WorkDesk — сборка macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: Архитектура
+        type: choice
+        options:
+          - both
+          - arm64
+          - x86_64
+        default: both
+
+env:
+  RUST_VERSION: '1.75'
+  MAC_RUST_VERSION: '1.81'
+  FLUTTER_MACOS_VERSION: '3.44.9'
+  VERSION: 1.5.3
+  APP_NAME: WorkDesk
+
+jobs:
+  build-macos:
+    name: Build macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Intel x86_64
+          - arch: x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+            flutter-target: macos
+          # Apple Silicon arm64
+          - arch: arm64
+            os: macos-14
+            target: aarch64-apple-darwin
+            flutter-target: macos
+    if: |
+      github.event.inputs.architecture == 'both' ||
+      (github.event.inputs.architecture == 'x86_64' && matrix.arch == 'x86_64') ||
+      (github.event.inputs.architecture == 'arm64' && matrix.arch == 'arm64')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MAC_RUST_VERSION }}
+          targets: ${{ matrix.target }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_MACOS_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install macOS dependencies
+        run: |
+          brew install create-dmg pkg-config libopus
+
+      - name: Get dependencies
+        run: |
+          cd flutter
+          flutter pub get
+
+      - name: Build RustDesk desktop (Rust)
+        run: |
+          cargo build --release --target=${{ matrix.target }}
+
+      - name: Build macOS app (Flutter)
+        run: |
+          cd flutter
+          flutter build macos --release --build-name=${{ env.VERSION }}
+
+      - name: Create dist directory
+        run: |
+          mkdir -p dist
+
+      - name: Create DMG package
+        run: |
+          # Копируем скомпилированное приложение
+          cp -r flutter/build/macos/Build/Products/Release/RustDesk.app dist/
+
+          # Создаем DMG
+          create-dmg \
+            --volname "WorkDesk ${{ env.VERSION }}" \
+            --volicon flutter/assets/icon.icns \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "RustDesk.app" 200 190 \
+            --hide-extension "RustDesk.app" \
+            --app-drop-link 600 190 \
+            "dist/WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.dmg" \
+            "dist/RustDesk.app"
+
+      - name: Create .app tarball
+        run: |
+          cd dist
+          tar -czf WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.app.tar.gz RustDesk.app
+          cd ..
+
+      - name: Verify built artifacts
+        run: |
+          ls -lh dist/
+          file dist/WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.dmg
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-macos-${{ matrix.arch }}-dmg
+          path: dist/WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.dmg
+          retention-days: 30
+
+      - name: Upload app tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-macos-${{ matrix.arch }}-app
+          path: dist/WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.app.tar.gz
+          retention-days: 30
+
+      - name: Create Release (optional)
+        if: github.event.inputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.dmg
+            dist/WorkDesk-${{ env.VERSION }}-${{ matrix.arch }}.app.tar.gz
+          tag_name: macos-${{ env.VERSION }}-${{ matrix.arch }}
+          draft: true
+          prerelease: true
+
+  build-universal:
+    name: Build universal macOS binary
+    needs: build-macos
+    runs-on: macos-14
+    if: ${{ github.event.inputs.architecture == 'both' }}
+
+    steps:
+      - name: Download Intel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: workdesk-macos-x86_64-app
+          path: dist-x86_64
+
+      - name: Download ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: workdesk-macos-arm64-app
+          path: dist-arm64
+
+      - name: Create universal binary
+        run: |
+          # Распаковываем оба архива
+          cd dist-x86_64 && tar -xzf *.tar.gz && cd ..
+          cd dist-arm64 && tar -xzf *.tar.gz && cd ..
+
+          # Создаем universal binary
+          mkdir -p dist-universal
+          cp -r dist-x86_64/RustDesk.app dist-universal/
+
+          # Используем lipo для создания universal binary
+          lipo -create \
+            dist-x86_64/RustDesk.app/Contents/MacOS/RustDesk \
+            dist-arm64/RustDesk.app/Contents/MacOS/RustDesk \
+            -output dist-universal/RustDesk.app/Contents/MacOS/RustDesk-universal
+
+          mv dist-universal/RustDesk.app/Contents/MacOS/RustDesk-universal \
+             dist-universal/RustDesk.app/Contents/MacOS/RustDesk
+
+      - name: Create universal DMG
+        run: |
+          brew install create-dmg
+
+          create-dmg \
+            --volname "WorkDesk universal" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "RustDesk.app" 200 190 \
+            --hide-extension "RustDesk.app" \
+            --app-drop-link 600 190 \
+            "dist-universal/WorkDesk-universal.dmg" \
+            "dist-universal/RustDesk.app"
+
+      - name: Upload universal DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: workdesk-macos-universal-dmg
+          path: dist-universal/WorkDesk-universal.dmg
+          retention-days: 30
+
+      - name: Create universal Release
+        if: github.event.inputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-universal/WorkDesk-universal.dmg
+          tag_name: macos-universal-${{ env.VERSION }}
+          draft: true
+          prerelease: true
